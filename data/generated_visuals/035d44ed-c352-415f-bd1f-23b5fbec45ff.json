@@ -1,0 +1,43 @@
+{
+  "artifact_id": "035d44ed-c352-415f-bd1f-23b5fbec45ff",
+  "title": "CPU Scheduling Algorithms: FCFS, SJF, and Round Robin",
+  "prompt": "Create a flowchart of CPU scheduling algorithms (FCFS, SJF, Round Robin) with ready queues.",
+  "artifact_type": "diagram",
+  "diagram_type": "flowchart TD",
+  "mermaid_code": "flowchart TD\n\n\tA[Ready Queue] -->|FCFS| B[FCFS Algorithm]\n\tB -->|Process| C[Process 1]\n\tC -->|Process| D[Process 2]\n\tD -->|Process| E[Process 3]\n\tE -->|Completion| F[Completion]\n\n\tF -->|SJF| G[SJF Algorithm]\n\tG -->|Shortest Job| H[Job 1]\n\tH -->|Completion| I[Completion]\n\tI -->|Next Process| J[Next Process]\n\tJ -->|SJF| K[Next Process]\n\tK -->|Process| L[Process 2]\n\tL -->|Completion| M[Completion]\n\tM -->|RR| N[RR Algorithm]\n\tN -->|Time Quantum| O[Time Quantum 1]\n\tO -->|Time Quantum| P[Time Quantum 2]\n\tP -->|Time Quantum| Q[Time Quantum 3]\n\tQ -->|Completion| R[Completion]\n\n\tR -->|End| S[End]",
+  "explanation": "This flowchart illustrates three common CPU scheduling algorithms: First-Come, First-Served (FCFS), Shortest Job First (SJF), and Round Robin (RR). Each algorithm has a distinct approach to scheduling processes based on priority or time quantum. FCFS processes in the order they arrive, SJF selects the process with the shortest next CPU burst, and RR uses a fixed time quantum to allocate CPU time to each process in a cyclic manner. The flowchart shows how each algorithm manages the ready queue and determines which process is next to execute.",
+  "grounding_status": "grounded",
+  "source_references": [
+    {
+      "document": "Operating_Systems_Notes.pdf",
+      "page": 3,
+      "score": 0.4394
+    },
+    {
+      "document": "R23-3rd-Year-B.Tech-CSEAI-and-ML.pdf",
+      "page": 6,
+      "score": 0.4258
+    },
+    {
+      "document": "Operating_Systems_Notes.pdf",
+      "page": 2,
+      "score": 0.3823
+    },
+    {
+      "document": "R23-3rd-Year-B.Tech-CSEAI-and-ML.pdf",
+      "page": 18,
+      "score": 0.3663
+    }
+  ],
+  "validation_status": "valid",
+  "created_at": "2026-10-03T03:29:51.315383+00:00",
+  "error_message": null,
+  "image_path": null,
+  "width": null,
+  "height": null,
+  "backend": null,
+  "metadata": {
+    "model": "qwen3:1.7b",
+    "retrieved_chunks_count": 4
+  }
+}

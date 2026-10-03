@@ -1,5 +1,5 @@
 /**
- * StudyRAG V2 — Modern ChatGPT-Style Local Academic Assistant Controller
+ * StudyRAG V2.2 — Modern Local Academic Assistant with Visual Learning Engine
  */
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -8,12 +8,16 @@ document.addEventListener("DOMContentLoaded", () => {
         currentConvId: null,
         conversations: [],
         activeModel: "qwen3:1.7b",
-        topK: 10,
+        topK: 4,
         minSimilarity: 0.25,
         debugMode: false,
+        diagramMode: false,
         theme: localStorage.getItem("studyrag_theme") || "dark",
         isGenerating: false,
         abortController: null,
+        modalZoomLevel: 1.0,
+        activeModalSvg: "",
+        activeModalTitle: "Diagram",
     };
 
     // Apply saved theme
@@ -35,6 +39,8 @@ document.addEventListener("DOMContentLoaded", () => {
         currentChatTitle: document.getElementById("current-chat-title"),
         activeModelName: document.getElementById("active-model-name"),
         clearChatBtn: document.getElementById("clear-chat-btn"),
+        diagramModeBtn: document.getElementById("diagram-mode-btn"),
+        inputModeIndicator: document.getElementById("input-mode-indicator"),
 
         chatMessagesContainer: document.getElementById("chat-messages"),
         welcomeScreen: document.getElementById("welcome-screen"),
@@ -69,9 +75,20 @@ document.addEventListener("DOMContentLoaded", () => {
         settingTheme: document.getElementById("setting-theme"),
         settingDebug: document.getElementById("setting-debug"),
         statusOllamaPill: document.getElementById("status-ollama-pill"),
+        statusVisualPill: document.getElementById("status-visual-pill"),
         statusMongoPill: document.getElementById("status-mongo-pill"),
         statusVectorsCount: document.getElementById("status-vectors-count"),
-        statusEmbedderName: document.getElementById("status-embedder-name"),
+
+        // Diagram Modal Lightbox
+        diagramModal: document.getElementById("diagram-modal"),
+        diagramModalTitle: document.getElementById("diagram-modal-title"),
+        diagramModalContent: document.getElementById("diagram-modal-content"),
+        diagramModalZoomIn: document.getElementById("diagram-modal-zoom-in"),
+        diagramModalZoomOut: document.getElementById("diagram-modal-zoom-out"),
+        diagramModalReset: document.getElementById("diagram-modal-reset"),
+        diagramModalDownloadSvg: document.getElementById("diagram-modal-download-svg"),
+        diagramModalDownloadPng: document.getElementById("diagram-modal-download-png"),
+        diagramModalClose: document.getElementById("diagram-modal-close"),
     };
 
     // Configure Marked.js renderer
@@ -80,6 +97,7 @@ document.addEventListener("DOMContentLoaded", () => {
             breaks: true,
             gfm: true,
             highlight: function (code, lang) {
+                if (lang === "mermaid") return code; // Let Mermaid render it
                 if (window.hljs && lang && hljs.getLanguage(lang)) {
                     try {
                         return hljs.highlight(code, { language: lang }).value;
@@ -90,8 +108,28 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    // Initialize Mermaid.js with strict security mode
+    function initMermaid() {
+        if (window.mermaid) {
+            try {
+                mermaid.initialize({
+                    startOnLoad: false,
+                    theme: state.theme === "dark" ? "dark" : "default",
+                    securityLevel: "strict",
+                    fontFamily: "Plus Jakarta Sans, sans-serif",
+                    flowchart: { htmlLabels: false, curve: "basis" },
+                    sequence: { showSequenceNumbers: false },
+                    state: { defaultRenderer: "dagre-d3" },
+                });
+            } catch (e) {
+                console.warn("Mermaid init:", e);
+            }
+        }
+    }
+
     // Initialize Application
     async function initApp() {
+        initMermaid();
         bindEvents();
         await fetchSystemStatus();
         await loadConversations();
@@ -110,6 +148,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // Clear Chat
         elements.clearChatBtn?.addEventListener("click", () => startNewChat());
+
+        // Diagram Mode Toggle
+        elements.diagramModeBtn?.addEventListener("click", () => {
+            state.diagramMode = !state.diagramMode;
+            elements.diagramModeBtn.classList.toggle("active", state.diagramMode);
+            if (elements.inputModeIndicator) {
+                elements.inputModeIndicator.textContent = state.diagramMode
+                    ? "📊 Diagram Generation Mode Active: prompts will generate structured architectural diagrams."
+                    : "100% Offline AI · Grounded in study materials · Local Mermaid diagrams";
+            }
+            elements.chatTextarea.placeholder = state.diagramMode
+                ? "Describe the diagram you want to generate (e.g. 'TCP Handshake', 'OS Process States')..."
+                : "Ask anything about your study materials or request diagrams...";
+            elements.chatTextarea.focus();
+        });
 
         // Textarea auto-resize & keypress
         elements.chatTextarea?.addEventListener("input", () => {
@@ -192,8 +245,31 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
 
-        // Modal backdrop click
-        [elements.docsModal, elements.settingsModal].forEach((modal) => {
+        // Diagram Modal Lightbox Controls
+        elements.diagramModalClose?.addEventListener("click", () => {
+            elements.diagramModal.classList.add("hidden");
+        });
+        elements.diagramModalZoomIn?.addEventListener("click", () => {
+            state.modalZoomLevel = Math.min(state.modalZoomLevel + 0.25, 3.0);
+            updateModalZoom();
+        });
+        elements.diagramModalZoomOut?.addEventListener("click", () => {
+            state.modalZoomLevel = Math.max(state.modalZoomLevel - 0.25, 0.5);
+            updateModalZoom();
+        });
+        elements.diagramModalReset?.addEventListener("click", () => {
+            state.modalZoomLevel = 1.0;
+            updateModalZoom();
+        });
+        elements.diagramModalDownloadSvg?.addEventListener("click", () => {
+            downloadSvgDirect(state.activeModalSvg, `${state.activeModalTitle.replace(/\s+/g, '_')}.svg`);
+        });
+        elements.diagramModalDownloadPng?.addEventListener("click", () => {
+            downloadPngDirect(state.activeModalSvg, `${state.activeModalTitle.replace(/\s+/g, '_')}.png`);
+        });
+
+        // Backdrop click close
+        [elements.docsModal, elements.settingsModal, elements.diagramModal].forEach((modal) => {
             modal?.addEventListener("click", (e) => {
                 if (e.target === modal) closeModal(modal);
             });
@@ -220,6 +296,13 @@ document.addEventListener("DOMContentLoaded", () => {
         modal?.classList.add("hidden");
     }
 
+    function updateModalZoom() {
+        const svgEl = elements.diagramModalContent?.querySelector("svg");
+        if (svgEl) {
+            svgEl.style.transform = `scale(${state.modalZoomLevel})`;
+        }
+    }
+
     // Fetch System Health & Config
     async function fetchSystemStatus() {
         try {
@@ -228,7 +311,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const data = await res.json();
 
             state.activeModel = data.ollama_model || "qwen3:1.7b";
-            state.topK = data.top_k || 10;
+            state.topK = data.top_k || 4;
             state.minSimilarity = data.min_similarity || 0.25;
 
             // Update UI indicators
@@ -236,14 +319,19 @@ document.addEventListener("DOMContentLoaded", () => {
             if (elements.docCounter) elements.docCounter.textContent = Object.keys(data.indexed_documents || {}).length;
             if (elements.modalDocCount) elements.modalDocCount.textContent = Object.keys(data.indexed_documents || {}).length;
             if (elements.statusVectorsCount) elements.statusVectorsCount.textContent = `${data.total_vectors || 0} Vectors`;
-            if (elements.statusEmbedderName) elements.statusEmbedderName.textContent = data.embedding_model || "all-MiniLM-L6-v2";
 
             const ollamaOk = data.ollama_available;
             const mongoOk = data.mongodb_available !== false;
+            const visualOk = data.visual_learning_enabled !== false;
 
             if (elements.statusOllamaPill) {
                 elements.statusOllamaPill.textContent = ollamaOk ? "Online" : "Offline";
                 elements.statusOllamaPill.className = `status-pill ${ollamaOk ? "online" : "offline"}`;
+            }
+
+            if (elements.statusVisualPill) {
+                elements.statusVisualPill.textContent = visualOk ? "Ready (Local Mermaid)" : "Disabled";
+                elements.statusVisualPill.className = `status-pill ${visualOk ? "online" : "offline"}`;
             }
 
             if (elements.statusMongoPill) {
@@ -252,12 +340,12 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             if (elements.globalStatusDot && elements.globalStatusLabel) {
-                if (ollamaOk && mongoOk) {
+                if (ollamaOk && visualOk) {
                     elements.globalStatusDot.className = "status-dot online";
-                    elements.globalStatusLabel.textContent = "Ollama & Mongo Ready";
-                } else if (ollamaOk && !mongoOk) {
+                    elements.globalStatusLabel.textContent = "Ollama & Visual Ready";
+                } else if (ollamaOk) {
                     elements.globalStatusDot.className = "status-dot online";
-                    elements.globalStatusLabel.textContent = "Ollama Online (Memory DB)";
+                    elements.globalStatusLabel.textContent = "Ollama Online";
                 } else {
                     elements.globalStatusDot.className = "status-dot";
                     elements.globalStatusLabel.textContent = "Ollama Offline";
@@ -357,13 +445,11 @@ document.addEventListener("DOMContentLoaded", () => {
                     </div>
                 `;
 
-                // Select chat click
                 item.addEventListener("click", (e) => {
                     if (e.target.closest(".delete-conv")) return;
                     openConversation(conv.conversation_id);
                 });
 
-                // Delete chat click
                 item.querySelector(".delete-conv")?.addEventListener("click", (e) => {
                     e.stopPropagation();
                     deleteConversation(conv.conversation_id);
@@ -420,9 +506,9 @@ document.addEventListener("DOMContentLoaded", () => {
             if (messages.length === 0) {
                 if (elements.welcomeScreen) elements.welcomeScreen.classList.remove("hidden");
             } else {
-                messages.forEach((msg) => {
-                    renderMessage(msg.role, msg.content, msg.sources, msg.metadata, false);
-                });
+                for (const msg of messages) {
+                    await renderMessage(msg.role, msg.content, msg.sources, msg.metadata, false);
+                }
                 scrollToBottom();
             }
 
@@ -449,8 +535,281 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
+    // Helper: Determine if query is requesting a diagram
+    function isDiagramQuery(query) {
+        if (state.diagramMode) return true;
+        const q = query.trim().toLowerCase();
+        const diagramKeywords = [
+            "diagram", "draw", "flowchart", "state diagram", "sequence diagram",
+            "architecture diagram", "class diagram", "er diagram", "visualize", "illustrate",
+            "show diagram", "create a diagram", "generate diagram", "state transition",
+            "handshake diagram", "scheduling diagram"
+        ];
+        return diagramKeywords.some((kw) => q.includes(kw));
+    }
+
+    // Helper: Normalize Mermaid diagram code (strip fences, unescape newlines)
+    function normalizeMermaidCode(code) {
+        if (!code || typeof code !== "string") return "";
+        let clean = code.trim();
+        // Remove markdown code fences if present
+        clean = clean.replace(/^```(?:mermaid|json|text)?\s*\n?/i, "");
+        clean = clean.replace(/\n?```\s*$/i, "");
+        // If the code has literal \\n instead of real newlines, unescape them
+        if (clean.includes("\\n") && (!clean.includes("\n") || clean.split("\\n").length > clean.split("\n").length)) {
+            try {
+                clean = clean.replace(/\\n/g, "\n").replace(/\\t/g, "\t").replace(/\\"/g, '"');
+            } catch (e) {}
+        }
+        return clean.trim();
+    }
+
+    // Helper: Sanitize explanation text to never expose raw JSON strings to users
+    function sanitizeDiagramExplanation(text) {
+        if (!text || typeof text !== "string") return "";
+        const trimmed = text.trim();
+        if (trimmed.startsWith("{") && (trimmed.includes('"mermaid"') || trimmed.includes('"title"') || trimmed.includes('"explanation"'))) {
+            try {
+                const parsed = JSON.parse(trimmed);
+                return parsed.explanation || "";
+            } catch (e) {
+                const match = trimmed.match(/"explanation"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"/);
+                if (match) {
+                    try {
+                        return JSON.parse(`"${match[1]}"`);
+                    } catch (err) {
+                        return match[1].replace(/\\n/g, "\n").replace(/\\"/g, '"');
+                    }
+                }
+                return "";
+            }
+        }
+        return text;
+    }
+
+    // Render Mermaid Diagram block inside an element
+    async function renderMermaidInElement(container, mermaidCode, uniqueId) {
+        if (!container) return null;
+
+        if (!window.mermaid) {
+            container.innerHTML = `
+                <div style="color:var(--accent-warning);font-size:12px;padding:12px;border:1px solid var(--border-color);border-radius:6px;background:var(--bg-card);">
+                    ⚠️ Mermaid library is not available. Ensure offline vendor scripts are loaded.
+                </div>
+            `;
+            return null;
+        }
+
+        const cleanCode = normalizeMermaidCode(mermaidCode);
+        if (!cleanCode) {
+            container.innerHTML = `
+                <div style="color:var(--accent-warning);font-size:12px;padding:12px;border:1px solid var(--border-color);border-radius:6px;background:var(--bg-card);">
+                    ⚠️ Diagram definition is empty or could not be generated.
+                </div>
+            `;
+            return null;
+        }
+
+        try {
+            const safePrefix = (uniqueId || Math.random().toString(36).substring(2, 9)).replace(/[^a-zA-Z0-9_]/g, "_");
+            const renderId = `mermaid_${safePrefix}_${Math.random().toString(36).substring(2, 7)}`;
+            const { svg } = await mermaid.render(renderId, cleanCode);
+            container.innerHTML = svg;
+            return svg;
+        } catch (err) {
+            console.warn("Mermaid rendering error:", err);
+            // Clean up any stray error SVG elements that Mermaid may have appended to document body
+            try {
+                document.querySelectorAll(`[id^="dmermaid_"]`).forEach((el) => el.remove());
+            } catch (e) {}
+
+            container.innerHTML = `
+                <div style="color:var(--accent-warning);font-size:12px;padding:12px;border:1px solid var(--border-color);border-radius:6px;background:var(--bg-card);">
+                    <div style="font-weight:600;margin-bottom:4px;">⚠️ Diagram syntax could not be rendered visually:</div>
+                    <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">${escapeHtml(err.message || "Syntax error detected in generated Mermaid definition.")}</div>
+                    <details style="margin-top:6px;">
+                        <summary style="cursor:pointer;font-size:11px;color:var(--accent-primary);outline:none;">View Diagram Source</summary>
+                        <pre style="margin-top:6px;background:var(--bg-app);padding:8px;border-radius:4px;font-size:11px;overflow-x:auto;white-space:pre-wrap;">${escapeHtml(cleanCode)}</pre>
+                    </details>
+                </div>
+            `;
+            return null;
+        }
+    }
+
+    // Render Diagram Card component
+    async function renderDiagramCard(artifact, parentEl) {
+        const uniqueId = `diag_${artifact.artifact_id || Math.random().toString(36).substring(2, 9)}`;
+        const card = document.createElement("div");
+        card.className = "diagram-card";
+
+        const isGrounded = artifact.grounding_status === "grounded";
+        const groundingLabel = isGrounded ? "📄 Grounded in Study Material" : "🌐 General Academic Knowledge";
+        const groundingClass = isGrounded ? "grounded" : "general_knowledge";
+        const rawMermaid = artifact.mermaid_code || artifact.mermaid || "";
+        const cleanExplanation = sanitizeDiagramExplanation(artifact.explanation || "");
+
+        card.innerHTML = `
+            <div class="diagram-header">
+                <div class="diagram-title-group">
+                    <span class="diagram-title">${escapeHtml(artifact.title || "Educational Diagram")}</span>
+                    <span class="diagram-type-tag">${escapeHtml(artifact.diagram_type || "flowchart")}</span>
+                </div>
+                <div class="diagram-badges-group">
+                    <span class="grounding-badge ${groundingClass}">${groundingLabel}</span>
+                </div>
+            </div>
+            <div class="diagram-viewport" id="${uniqueId}_viewport">
+                <div class="history-skeleton">Rendering diagram...</div>
+            </div>
+            <div class="diagram-actions-bar">
+                <div class="diagram-btn-group">
+                    <button class="btn-diagram-action export-svg-btn" title="Download SVG Vector Graphic">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg> SVG
+                    </button>
+                    <button class="btn-diagram-action export-png-btn" title="Download PNG Image">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> PNG
+                    </button>
+                    <button class="btn-diagram-action copy-mermaid-btn" title="Copy Mermaid Definition">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy Code
+                    </button>
+                </div>
+                <div class="diagram-btn-group">
+                    <button class="btn-diagram-action fullscreen-btn" title="View in Fullscreen Lightbox">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg> Fullscreen
+                    </button>
+                </div>
+            </div>
+            ${cleanExplanation ? `<div class="diagram-explanation">${formatMarkdown(cleanExplanation)}</div>` : ""}
+            ${renderSourcesHtml(artifact.source_references)}
+        `;
+
+        parentEl.appendChild(card);
+
+        // Render Mermaid SVG
+        const viewport = card.querySelector(`#${uniqueId}_viewport`);
+        const renderedSvg = await renderMermaidInElement(viewport, rawMermaid, uniqueId);
+
+        // Action Buttons Logic
+        const svgBtn = card.querySelector(".export-svg-btn");
+        const pngBtn = card.querySelector(".export-png-btn");
+        const copyBtn = card.querySelector(".copy-mermaid-btn");
+        const fullBtn = card.querySelector(".fullscreen-btn");
+
+        svgBtn?.addEventListener("click", () => {
+            const svgContent = viewport.querySelector("svg")?.outerHTML || renderedSvg;
+            if (svgContent) {
+                // Save to server for export tracking
+                if (artifact.artifact_id) {
+                    fetch("/api/visualize/export/svg", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ artifact_id: artifact.artifact_id, svg: svgContent }),
+                    }).catch(() => {});
+                }
+
+                downloadSvgDirect(svgContent, `${(artifact.title || "diagram").replace(/\s+/g, "_")}.svg`);
+            }
+        });
+
+        pngBtn?.addEventListener("click", () => {
+            const svgContent = viewport.querySelector("svg")?.outerHTML || renderedSvg;
+            if (svgContent) {
+                downloadPngDirect(svgContent, `${(artifact.title || "diagram").replace(/\s+/g, "_")}.png`);
+            }
+        });
+
+        copyBtn?.addEventListener("click", () => {
+            const codeToCopy = normalizeMermaidCode(rawMermaid);
+            navigator.clipboard.writeText(codeToCopy).then(() => {
+                copyBtn.textContent = "Copied!";
+                setTimeout(() => (copyBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy Code'), 2000);
+            });
+        });
+
+        fullBtn?.addEventListener("click", () => {
+            const svgContent = viewport.querySelector("svg")?.outerHTML || renderedSvg;
+            if (svgContent) {
+                state.activeModalSvg = svgContent;
+                state.activeModalTitle = artifact.title || "Educational Diagram";
+                state.modalZoomLevel = 1.0;
+                elements.diagramModalTitle.textContent = state.activeModalTitle;
+                elements.diagramModalContent.innerHTML = svgContent;
+                updateModalZoom();
+                openModal(elements.diagramModal);
+            }
+        });
+
+        return card;
+    }
+
+    // Direct SVG & PNG Client-side downloads
+    function downloadSvgDirect(svgContent, filename) {
+        if (!svgContent) return;
+        let formattedSvg = svgContent;
+        if (!formattedSvg.includes('xmlns="http://www.w3.org/2000/svg"')) {
+            formattedSvg = formattedSvg.replace("<svg ", '<svg xmlns="http://www.w3.org/2000/svg" ');
+        }
+        const blob = new Blob([formattedSvg], { type: "image/svg+xml;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename || "studyrag_diagram.svg";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    function downloadPngDirect(svgContent, filename) {
+        if (!svgContent) return;
+        let formattedSvg = svgContent;
+        if (!formattedSvg.includes('xmlns="http://www.w3.org/2000/svg"')) {
+            formattedSvg = formattedSvg.replace("<svg ", '<svg xmlns="http://www.w3.org/2000/svg" ');
+        }
+        const img = new Image();
+        const svgBlob = new Blob([formattedSvg], { type: "image/svg+xml;charset=utf-8" });
+        const url = URL.createObjectURL(svgBlob);
+
+        img.onload = () => {
+            try {
+                const canvas = document.createElement("canvas");
+                const scale = 2; // 2x high-DPI scaling
+                canvas.width = (img.naturalWidth || img.width || 800) * scale;
+                canvas.height = (img.naturalHeight || img.height || 600) * scale;
+                const ctx = canvas.getContext("2d");
+                ctx.fillStyle = state.theme === "dark" ? "#181b24" : "#ffffff";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+                canvas.toBlob((blob) => {
+                    if (!blob) return;
+                    const pngUrl = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = pngUrl;
+                    a.download = filename || "studyrag_diagram.png";
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(pngUrl);
+                }, "image/png");
+            } catch (err) {
+                console.error("PNG export error:", err);
+            } finally {
+                URL.revokeObjectURL(url);
+            }
+        };
+
+        img.onerror = (err) => {
+            console.error("Failed to load SVG for PNG conversion:", err);
+            URL.revokeObjectURL(url);
+        };
+
+        img.src = url;
+    }
+
     // Message Rendering & Sending
-    function renderMessage(role, content, sources = [], metadata = {}, animate = true) {
+    async function renderMessage(role, content, sources = [], metadata = {}, animate = true) {
         if (elements.welcomeScreen) elements.welcomeScreen.classList.add("hidden");
 
         const wrapper = document.createElement("div");
@@ -465,15 +824,30 @@ document.addEventListener("DOMContentLoaded", () => {
                     ${renderDebugHtml(metadata?.retrieved_chunks_data)}
                 </div>
             `;
+            elements.messagesList.appendChild(wrapper);
+
+            // If message contains mermaid code blocks, render them
+            const mermaidBlocks = wrapper.querySelectorAll("code.language-mermaid");
+            for (const codeEl of mermaidBlocks) {
+                const pre = codeEl.closest("pre");
+                if (pre) {
+                    const mermaidCode = codeEl.textContent;
+                    const container = document.createElement("div");
+                    container.className = "diagram-viewport";
+                    pre.replaceWith(container);
+                    await renderMermaidInElement(container, mermaidCode);
+                }
+            }
         } else {
             wrapper.innerHTML = `
                 <div class="message-body">
                     ${escapeHtml(content)}
                 </div>
             `;
+            elements.messagesList.appendChild(wrapper);
         }
 
-        // Attach copy button handlers
+        // Attach copy button handlers for standard code blocks
         wrapper.querySelectorAll(".code-copy-btn").forEach((btn) => {
             btn.addEventListener("click", () => {
                 const pre = btn.closest("pre");
@@ -485,7 +859,6 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         });
 
-        elements.messagesList.appendChild(wrapper);
         return wrapper;
     }
 
@@ -546,7 +919,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function formatMarkdown(text) {
         if (!text) return "";
 
-        // Check if there are SVG diagram blocks to preserve
+        // Preserve SVG blocks
         const svgBlocks = [];
         let sanitizedText = text.replace(/<svg[\s\S]*?<\/svg>/gi, (match) => {
             const placeholder = `%%SVG_BLOCK_${svgBlocks.length}%%`;
@@ -557,8 +930,8 @@ document.addEventListener("DOMContentLoaded", () => {
         if (window.marked) {
             let html = marked.parse(sanitizedText);
 
-            // Add custom code headers with copy button
             html = html.replace(/<pre><code class="language-([^"]+)">([\s\S]*?)<\/code><\/pre>/g, (match, lang, code) => {
+                if (lang === "mermaid") return match;
                 return `
                     <pre>
                         <div class="code-header">
@@ -573,7 +946,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 `;
             });
 
-            // Restore SVG diagram blocks
             svgBlocks.forEach((svg, idx) => {
                 const placeholder = `%%SVG_BLOCK_${idx}%%`;
                 html = html.replace(placeholder, `<div class="svg-diagram-container">${svg}</div>`);
@@ -584,7 +956,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
         return escapeHtml(text).replace(/\n/g, "<br>");
     }
-
 
     async function sendMessage() {
         const query = elements.chatTextarea.value.trim();
@@ -597,7 +968,66 @@ document.addEventListener("DOMContentLoaded", () => {
         toggleSendButton();
         scrollToBottom();
 
-        // Assistant skeleton message
+        // Check if diagram workflow is triggered
+        if (isDiagramQuery(query)) {
+            await handleDiagramGeneration(query);
+            return;
+        }
+
+        // Standard text streaming workflow
+        await handleStreamingChat(query);
+    }
+
+    // Handle dedicated visual diagram generation
+    async function handleDiagramGeneration(query) {
+        setGeneratingState(true);
+        const assistantWrapper = document.createElement("div");
+        assistantWrapper.className = "message-wrapper assistant";
+        assistantWrapper.innerHTML = `
+            <div class="message-avatar">📊</div>
+            <div class="message-body">
+                <div class="history-skeleton">Searching study materials & generating technical diagram...</div>
+            </div>
+        `;
+        elements.messagesList.appendChild(assistantWrapper);
+        scrollToBottom();
+
+        try {
+            const res = await fetch("/api/visualize", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    question: query,
+                    conversation_id: state.currentConvId,
+                    top_k: state.topK,
+                    min_similarity: state.minSimilarity,
+                    model: state.activeModel,
+                }),
+            });
+
+            const data = await res.json();
+            const messageBody = assistantWrapper.querySelector(".message-body");
+            messageBody.innerHTML = "";
+
+            if (!res.ok || data.error) {
+                messageBody.innerHTML = `<span style="color:var(--accent-error);">⚠️ Diagram generation error: ${escapeHtml(data.error || "Failed to generate diagram")}</span>`;
+            } else {
+                await renderDiagramCard(data, messageBody);
+            }
+
+            await loadConversations();
+        } catch (e) {
+            console.error("Visual generation error:", e);
+            const messageBody = assistantWrapper.querySelector(".message-body");
+            messageBody.innerHTML = `<span style="color:var(--accent-error);">⚠️ Error communicating with visual learning engine: ${escapeHtml(e.message)}</span>`;
+        } finally {
+            setGeneratingState(false);
+            scrollToBottom();
+        }
+    }
+
+    // Handle standard text chat stream
+    async function handleStreamingChat(query) {
         setGeneratingState(true);
         const assistantWrapper = renderMessage("assistant", "", [], {}, true);
         const markdownBody = assistantWrapper.querySelector(".markdown-content");
@@ -634,7 +1064,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 partialBuffer += decoder.decode(value, { stream: true });
                 const lines = partialBuffer.split("\n");
-                partialBuffer = lines.pop(); // keep trailing partial line
+                partialBuffer = lines.pop();
 
                 for (const line of lines) {
                     if (!line.startsWith("data: ")) continue;
@@ -661,7 +1091,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             streamTokens = event.answer || streamTokens;
                             markdownBody.innerHTML = formatMarkdown(streamTokens);
 
-                            // Append sources and debug elements
+                            // Append sources and debug
                             const bodyEl = assistantWrapper.querySelector(".message-body");
                             if (sources.length > 0) {
                                 const sourcesDiv = document.createElement("div");
@@ -673,14 +1103,26 @@ document.addEventListener("DOMContentLoaded", () => {
                                 debugDiv.innerHTML = renderDebugHtml(retrievedChunks);
                                 bodyEl.appendChild(debugDiv);
                             }
+
+                            // Render any embedded Mermaid diagrams
+                            const mermaidBlocks = bodyEl.querySelectorAll("code.language-mermaid");
+                            for (const codeEl of mermaidBlocks) {
+                                const pre = codeEl.closest("pre");
+                                if (pre) {
+                                    const mCode = codeEl.textContent;
+                                    const container = document.createElement("div");
+                                    container.className = "diagram-viewport";
+                                    pre.replaceWith(container);
+                                    await renderMermaidInElement(container, mCode);
+                                }
+                            }
                         }
                     } catch (err) {
-                        console.debug("JSON SSE parse chunk:", err);
+                        console.debug("SSE json chunk parse:", err);
                     }
                 }
             }
 
-            // Refresh conversations list to show updated titles
             await loadConversations();
         } catch (e) {
             if (e.name === "AbortError") {
@@ -842,9 +1284,10 @@ document.addEventListener("DOMContentLoaded", () => {
         state.debugMode = elements.settingDebug.checked;
         state.activeModel = elements.settingModel.value;
 
-        // Apply theme
+        // Apply theme and re-init Mermaid theme
         document.documentElement.setAttribute("data-theme", state.theme);
         localStorage.setItem("studyrag_theme", state.theme);
+        initMermaid();
 
         try {
             await fetch("/api/settings", {

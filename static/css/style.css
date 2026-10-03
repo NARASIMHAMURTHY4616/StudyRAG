@@ -1272,6 +1272,224 @@ input:checked + .slider:before {
     display: none !important;
 }
 
+/* ==========================================================================
+   Visual Learning Engine Styles (V2.2)
+   ========================================================================== */
+
+.diagram-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 16px;
+    margin: 12px 0;
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow var(--transition-normal), border-color var(--transition-normal);
+}
+
+.diagram-card:hover {
+    border-color: var(--border-light);
+    box-shadow: var(--shadow-md);
+}
+
+.diagram-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 14px;
+}
+
+.diagram-title-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.diagram-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.diagram-type-tag {
+    font-size: 11px;
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    background: var(--bg-tag);
+    color: var(--accent-primary);
+    padding: 2px 8px;
+    border-radius: var(--radius-full);
+    font-weight: 600;
+}
+
+.diagram-badges-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.grounding-badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: var(--radius-full);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.grounding-badge.grounded {
+    background: rgba(16, 185, 129, 0.12);
+    color: var(--accent-success);
+    border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.grounding-badge.general_knowledge {
+    background: rgba(79, 120, 255, 0.12);
+    color: var(--accent-primary);
+    border: 1px solid rgba(79, 120, 255, 0.25);
+}
+
+.diagram-viewport {
+    background: var(--bg-app);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 20px 14px;
+    min-height: 180px;
+    max-height: 480px;
+    overflow: auto;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+}
+
+.diagram-viewport svg {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 0 auto;
+}
+
+.diagram-actions-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-color);
+    margin-top: 14px;
+}
+
+.diagram-btn-group {
+    display: flex;
+    gap: 6px;
+}
+
+.btn-diagram-action {
+    background: var(--bg-tag);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    border-radius: var(--radius-sm);
+    padding: 5px 10px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: all var(--transition-fast);
+}
+
+.btn-diagram-action:hover {
+    background: var(--bg-sidebar-hover);
+    color: var(--text-primary);
+    border-color: var(--border-light);
+}
+
+.diagram-explanation {
+    margin-top: 12px;
+    font-size: 13.5px;
+    line-height: 1.6;
+    color: var(--text-primary);
+}
+
+.diagram-mode-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    padding: 6px 12px;
+    border-radius: var(--radius-full);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.diagram-mode-toggle:hover {
+    background: var(--bg-sidebar-hover);
+    color: var(--text-primary);
+    border-color: var(--border-light);
+}
+
+.diagram-mode-toggle.active {
+    background: rgba(79, 120, 255, 0.15);
+    border-color: var(--accent-primary);
+    color: var(--accent-primary);
+}
+
+/* Fullscreen Diagram Lightbox Modal */
+.diagram-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(8px);
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+}
+
+.diagram-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: #ffffff;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.diagram-modal-controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.diagram-modal-content {
+    flex: 1;
+    overflow: auto;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+
+.diagram-modal-content svg {
+    max-width: 90vw;
+    max-height: 80vh;
+    transition: transform 0.2s ease;
+}
+
 /* Responsive Styles */
 @media (max-width: 768px) {
     .sidebar {
@@ -1293,4 +1511,10 @@ input:checked + .slider:before {
     .conversation-title-container h2 {
         max-width: 200px;
     }
+
+    .diagram-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
 }
+

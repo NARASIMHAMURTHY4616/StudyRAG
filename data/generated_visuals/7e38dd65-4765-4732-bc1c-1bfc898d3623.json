@@ -1,0 +1,22 @@
+{
+  "artifact_id": "7e38dd65-4765-4732-bc1c-1bfc898d3623",
+  "title": "General Turing Machine",
+  "prompt": "Diagram a Turing machine",
+  "artifact_type": "diagram",
+  "diagram_type": "stateDiagram-v2",
+  "mermaid_code": "stateDiagram-v2\n[*] --> q0\nq0 --> q1: 1/0,R",
+  "explanation": "A conceptual Turing machine state transition.",
+  "grounding_status": "general_knowledge",
+  "source_references": [],
+  "validation_status": "valid",
+  "created_at": "2026-10-03T04:40:42.017089+00:00",
+  "error_message": null,
+  "image_path": null,
+  "width": null,
+  "height": null,
+  "backend": null,
+  "metadata": {
+    "model": "qwen3:1.7b",
+    "retrieved_chunks_count": 0
+  }
+}

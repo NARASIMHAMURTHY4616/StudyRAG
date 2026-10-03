@@ -6,7 +6,7 @@ import json
 import logging
 import argparse
 from pathlib import Path
-from flask import Flask, render_template, request, jsonify, Response, stream_with_context
+from flask import Flask, render_template, request, jsonify, Response, stream_with_context, send_file
 from werkzeug.utils import secure_filename
 
 from config import settings
@@ -20,6 +20,11 @@ from ingestion.chunker import chunk_documents
 from database.mongo import MongoDBManager
 from database.conversations import ConversationManager
 from terminal.cli import run_terminal_mode
+from visual_learning.diagram_service import DiagramService
+from visual_learning.storage import VisualStorageManager, is_safe_identifier
+from visual_learning.image_service import ImageService
+from visual_learning.exceptions import VisualLearningError, ArtifactNotFoundError, StorageSecurityError
+from visual_learning.diagram_validator import ALLOWED_DIAGRAM_TYPES
 
 # Setup logging
 logging.basicConfig(
@@ -33,15 +38,18 @@ logger = logging.getLogger("StudyRAG")
 settings.ensure_directories()
 
 # Initialize Singletons
-logger.info("Initializing StudyRAG V2 Components...")
+logger.info("Initializing StudyRAG V2.2 Components...")
 ollama_client = OllamaClient()
 embedder = Embedder()
 vector_store = LocalVectorStore()
 retriever = Retriever(embedder=embedder, vector_store=vector_store)
-rag_pipeline = RAGPipeline(retriever=retriever, ollama_client=ollama_client)
+storage_manager = VisualStorageManager()
+diagram_service = DiagramService(ollama_client=ollama_client, storage_manager=storage_manager)
+rag_pipeline = RAGPipeline(retriever=retriever, ollama_client=ollama_client, diagram_service=diagram_service)
+image_service = ImageService()
 mongo_manager = MongoDBManager.get_instance()
 conv_manager = ConversationManager(mongo_manager=mongo_manager)
-logger.info("StudyRAG V2 Components initialized.")
+logger.info("StudyRAG V2.2 Components initialized.")
 
 # Initialize Flask App
 app = Flask(__name__)
@@ -63,6 +71,8 @@ def index():
         embedding_model=settings.EMBEDDING_MODEL,
         default_top_k=settings.TOP_K,
         default_min_sim=settings.MIN_SIMILARITY,
+        visual_learning_enabled=settings.VISUAL_LEARNING_ENABLED,
+        image_generation_enabled=settings.VISUAL_IMAGE_GENERATION_ENABLED,
     )
 
 
@@ -353,6 +363,7 @@ def upload():
 @app.route("/api/status", methods=["GET"])
 def api_status():
     """Return comprehensive system and service health status."""
+    mermaid_exists = (settings.BASE_DIR / "static/vendor/mermaid/mermaid.min.js").exists()
     return jsonify({
         "ollama_available": ollama_client.is_available(),
         "ollama_model": settings.OLLAMA_MODEL,
@@ -364,6 +375,10 @@ def api_status():
         "top_k": settings.TOP_K,
         "min_similarity": settings.MIN_SIMILARITY,
         "target_chunks_per_page": settings.TARGET_CHUNKS_PER_PAGE,
+        "visual_learning_enabled": settings.VISUAL_LEARNING_ENABLED,
+        "mermaid_available": mermaid_exists,
+        "image_generation_enabled": settings.VISUAL_IMAGE_GENERATION_ENABLED,
+        "image_backend_status": image_service.get_status(),
     })
 
 
@@ -385,6 +400,184 @@ def update_settings():
         "min_similarity": settings.MIN_SIMILARITY,
         "model": settings.OLLAMA_MODEL,
     })
+
+
+# ==========================================
+# Visual Learning Engine Endpoints (V2.2)
+# ==========================================
+
+@app.route("/api/visualize", methods=["POST"])
+def visualize():
+    """
+    Generate an educational diagram (Mermaid) grounded in study materials.
+    """
+    data = request.get_json(silent=True) or {}
+    question = (data.get("question") or data.get("prompt") or "").strip()
+    conv_id = data.get("conversation_id")
+    diagram_type = data.get("diagram_type")
+    top_k = int(data.get("top_k", settings.TOP_K))
+    min_similarity = float(data.get("min_similarity", settings.MIN_SIMILARITY))
+    model = data.get("model") or settings.OLLAMA_MODEL
+
+    if not question:
+        return jsonify({"error": "Prompt or question is required.", "status": "error"}), 400
+
+    if len(question) > settings.VISUAL_MAX_PROMPT_LENGTH:
+        return jsonify({
+            "error": f"Prompt length exceeds maximum allowed ({settings.VISUAL_MAX_PROMPT_LENGTH} characters).",
+            "status": "error",
+        }), 400
+
+    # Load conversation history for context preservation
+    history = []
+    if conv_id:
+        conv_data = conv_manager.get_conversation(conv_id)
+        if conv_data:
+            history = conv_data.get("messages", [])
+        conv_manager.add_message(
+            conversation_id=conv_id,
+            role="user",
+            content=f"[Diagram Request] {question}",
+        )
+
+    try:
+        artifact_dict = rag_pipeline.generate_visual_explanation(
+            question=question,
+            preferred_diagram_type=diagram_type,
+            conversation_history=history,
+            top_k=top_k,
+            min_similarity=min_similarity,
+            model=model,
+        )
+
+        # If in a conversation, save assistant response with diagram metadata
+        if conv_id:
+            summary_content = (
+                f"### {artifact_dict.get('title')}\n\n"
+                f"```mermaid\n{artifact_dict.get('mermaid_code')}\n```\n\n"
+                f"{artifact_dict.get('explanation')}"
+            )
+            conv_manager.add_message(
+                conversation_id=conv_id,
+                role="assistant",
+                content=summary_content,
+                sources=artifact_dict.get("source_references", []),
+                metadata={
+                    "artifact_id": artifact_dict.get("artifact_id"),
+                    "diagram_type": artifact_dict.get("diagram_type"),
+                    "grounding_status": artifact_dict.get("grounding_status"),
+                    "validation_status": artifact_dict.get("validation_status"),
+                },
+            )
+
+        return jsonify(artifact_dict), 200
+
+    except Exception as e:
+        logger.error(f"Error generating visual diagram: {e}", exc_info=True)
+        return jsonify({"error": f"Failed to generate diagram: {str(e)}", "status": "error"}), 500
+
+
+@app.route("/api/visualize/status", methods=["GET"])
+def visualize_status():
+    """Return Visual Learning Engine and image backend status."""
+    mermaid_exists = (settings.BASE_DIR / "static/vendor/mermaid/mermaid.min.js").exists()
+    return jsonify({
+        "visual_learning_enabled": settings.VISUAL_LEARNING_ENABLED,
+        "mermaid_available": mermaid_exists,
+        "mermaid_asset_path": settings.MERMAID_ASSET_PATH,
+        "supported_diagram_types": sorted(list(ALLOWED_DIAGRAM_TYPES)),
+        "image_generation_enabled": settings.VISUAL_IMAGE_GENERATION_ENABLED,
+        "image_backend_status": image_service.get_status(),
+    })
+
+
+@app.route("/api/visualize/artifact/<artifact_id>", methods=["GET"])
+def get_visual_artifact(artifact_id):
+    """Retrieve saved visual artifact metadata."""
+    if not is_safe_identifier(artifact_id):
+        return jsonify({"error": "Invalid artifact identifier format."}), 400
+
+    try:
+        artifact = storage_manager.get_artifact(artifact_id)
+        return jsonify(artifact.to_dict()), 200
+    except ArtifactNotFoundError:
+        return jsonify({"error": f"Artifact '{artifact_id}' not found."}), 404
+    except StorageSecurityError as e:
+        return jsonify({"error": str(e)}), 403
+    except Exception as e:
+        logger.error(f"Error fetching artifact '{artifact_id}': {e}")
+        return jsonify({"error": "Internal server error fetching artifact."}), 500
+
+
+@app.route("/api/visualize/export/svg", methods=["POST"])
+def export_visual_svg():
+    """Sanitize and persist client-rendered SVG diagram."""
+    data = request.get_json(silent=True) or {}
+    artifact_id = data.get("artifact_id")
+    raw_svg = data.get("svg", "")
+
+    if not artifact_id or not is_safe_identifier(artifact_id):
+        return jsonify({"error": "Valid artifact_id is required."}), 400
+
+    if not raw_svg or not raw_svg.strip():
+        return jsonify({"error": "SVG content is required."}), 400
+
+    try:
+        svg_path = storage_manager.save_svg_export(artifact_id, raw_svg)
+        return jsonify({
+            "status": "success",
+            "artifact_id": artifact_id,
+            "filename": f"{artifact_id}.svg",
+            "download_url": f"/api/visualize/export/{artifact_id}",
+        }), 200
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except StorageSecurityError as e:
+        return jsonify({"error": str(e)}), 403
+    except Exception as e:
+        logger.error(f"Error exporting SVG: {e}")
+        return jsonify({"error": f"Export failed: {str(e)}"}), 500
+
+
+@app.route("/api/visualize/export/<artifact_id>", methods=["GET"])
+def download_visual_export(artifact_id):
+    """Download exported SVG file."""
+    if not is_safe_identifier(artifact_id):
+        return jsonify({"error": "Invalid artifact identifier format."}), 400
+
+    svg_path = storage_manager.get_svg_export_path(artifact_id)
+    if not svg_path or not svg_path.exists():
+        return jsonify({"error": f"Exported SVG for artifact '{artifact_id}' not found."}), 404
+
+    return send_file(
+        svg_path,
+        mimetype="image/svg+xml",
+        as_attachment=True,
+        download_name=f"studyrag_diagram_{artifact_id[:8]}.svg",
+    )
+
+
+@app.route("/api/visualize/image", methods=["POST"])
+def generate_image_illustration():
+    """Generate educational illustration using optional local backend."""
+    data = request.get_json(silent=True) or {}
+    prompt = (data.get("prompt") or data.get("question") or "").strip()
+    negative_prompt = data.get("negative_prompt")
+    width = data.get("width")
+    height = data.get("height")
+    seed = data.get("seed")
+
+    if not prompt:
+        return jsonify({"error": "Prompt is required.", "status": "error"}), 400
+
+    result = image_service.generate_illustration(
+        prompt=prompt,
+        negative_prompt=negative_prompt,
+        width=width,
+        height=height,
+        seed=seed,
+    )
+    return jsonify(result.to_dict())
 
 
 # ==========================================

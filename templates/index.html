@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StudyRAG V2 — Local Academic AI Assistant</title>
+    <title>StudyRAG V2.2 — Visual Learning & Offline Academic Assistant</title>
     <!-- Modern Typography -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     
-    <!-- Highlight.js for Code Highlighting -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" id="hljs-theme">
+    <!-- Local Offline Highlight.js for Code Highlighting -->
+    <link rel="stylesheet" href="/static/vendor/highlight/github-dark.min.css" id="hljs-theme">
     
     <!-- App Styles -->
     <link rel="stylesheet" href="/static/css/style.css">
@@ -24,7 +24,7 @@
                     <div class="brand-logo">📚</div>
                     <div class="brand-text">
                         <span class="brand-title">StudyRAG</span>
-                        <span class="brand-version">v2.0</span>
+                        <span class="brand-version">v2.2</span>
                     </div>
                 </div>
                 <button id="new-chat-btn" class="btn btn-new-chat" title="Start a new conversation">
@@ -58,7 +58,7 @@
                 </button>
                 <div class="system-status-indicator">
                     <span class="status-dot online" id="global-status-dot"></span>
-                    <span class="status-label" id="global-status-label">Ollama & Mongo Ready</span>
+                    <span class="status-label" id="global-status-label">Ollama & Visual Ready</span>
                 </div>
             </div>
         </aside>
@@ -76,6 +76,10 @@
                     </div>
                 </div>
                 <div class="chat-header-right">
+                    <button id="diagram-mode-btn" class="diagram-mode-toggle" title="Toggle Visual Diagram Generation Mode">
+                        <span>📊</span>
+                        <span>Diagram Mode</span>
+                    </button>
                     <div class="model-badge" id="active-model-badge">
                         <span class="model-dot"></span>
                         <span id="active-model-name">{{ ollama_model }}</span>
@@ -90,37 +94,37 @@
             <div class="chat-messages-container" id="chat-messages">
                 <!-- Welcome / Empty State Screen -->
                 <div class="welcome-screen" id="welcome-screen">
-                    <div class="welcome-icon">🎓</div>
-                    <h1>Welcome to StudyRAG V2</h1>
-                    <p class="welcome-subtitle">Your offline, local AI academic assistant grounded in your uploaded study materials.</p>
+                    <div class="welcome-icon">📊</div>
+                    <h1>Welcome to StudyRAG V2.2</h1>
+                    <p class="welcome-subtitle">Offline AI Study Assistant with Visual Learning Engine & Grounded Diagram Generation.</p>
                     
                     <div class="prompt-suggestions">
-                        <div class="suggestion-card" data-prompt="Explain CPU process scheduling algorithms (FCFS, SJF, Round Robin) with comparisons.">
-                            <span class="card-icon">⚡</span>
-                            <div class="card-content">
-                                <strong>Process Scheduling</strong>
-                                <span>Compare FCFS, SJF & Round Robin algorithms</span>
-                            </div>
-                        </div>
-                        <div class="suggestion-card" data-prompt="Explain the four necessary conditions for Deadlock and how to prevent them.">
-                            <span class="card-icon">🔒</span>
-                            <div class="card-content">
-                                <strong>Deadlock Prevention</strong>
-                                <span>Explain Coffman conditions and avoidance</span>
-                            </div>
-                        </div>
-                        <div class="suggestion-card" data-prompt="Explain the TCP three-way handshake and connection teardown process in detail.">
+                        <div class="suggestion-card" data-prompt="Generate a sequence diagram of the TCP three-way handshake and connection teardown process.">
                             <span class="card-icon">🌐</span>
                             <div class="card-content">
-                                <strong>TCP/IP Handshake</strong>
-                                <span>SYN, SYN-ACK, and ACK packet mechanics</span>
+                                <strong>TCP 3-Way Handshake</strong>
+                                <span>Sequence diagram: SYN, SYN-ACK, ACK flow</span>
                             </div>
                         </div>
-                        <div class="suggestion-card" data-prompt="Summarize the key differences between paging and segmentation in memory management.">
+                        <div class="suggestion-card" data-prompt="Generate a state transition diagram of Operating System process states (New, Ready, Running, Waiting, Terminated).">
+                            <span class="card-icon">⚙️</span>
+                            <div class="card-content">
+                                <strong>OS Process States</strong>
+                                <span>State transition diagram & lifecycle events</span>
+                            </div>
+                        </div>
+                        <div class="suggestion-card" data-prompt="Create a flowchart of CPU scheduling algorithms (FCFS, SJF, Round Robin) with ready queues.">
+                            <span class="card-icon">⚡</span>
+                            <div class="card-content">
+                                <strong>CPU Scheduling Flow</strong>
+                                <span>Multi-level queues & dispatcher flow</span>
+                            </div>
+                        </div>
+                        <div class="suggestion-card" data-prompt="Create an architecture diagram of a RAG pipeline and vector search retrieval process.">
                             <span class="card-icon">🧠</span>
                             <div class="card-content">
-                                <strong>Memory Management</strong>
-                                <span>Paging vs Segmentation analysis</span>
+                                <strong>RAG Architecture</strong>
+                                <span>Embeddings, vector search & LLM synthesis</span>
                             </div>
                         </div>
                     </div>
@@ -139,7 +143,7 @@
                     <textarea 
                         id="chat-textarea" 
                         rows="1" 
-                        placeholder="Ask anything about your study materials..."
+                        placeholder="Ask a question or request a diagram (e.g. 'Diagram TCP Handshake')..."
                         autocomplete="off"
                     ></textarea>
                     <button id="send-message-btn" class="send-btn" disabled title="Send message (Enter)">
@@ -150,7 +154,7 @@
                     </button>
                 </div>
                 <div class="input-disclaimer">
-                    <span>StudyRAG operates 100% offline. Responses are strictly grounded in your indexed documents.</span>
+                    <span id="input-mode-indicator">100% Offline AI · Grounded in study materials · Local Mermaid diagrams</span>
                 </div>
             </div>
         </main>
@@ -212,10 +216,10 @@
                     <div class="setting-item">
                         <div class="setting-label-row">
                             <label for="setting-top-k">Top-K Retrieved Chunks</label>
-                            <span class="setting-value" id="val-top-k">10</span>
+                            <span class="setting-value" id="val-top-k">4</span>
                         </div>
-                        <input type="range" id="setting-top-k" min="1" max="20" value="10" class="range-slider">
-                        <small class="setting-hint">Number of most relevant academic chunks retrieved (Default: 10)</small>
+                        <input type="range" id="setting-top-k" min="1" max="20" value="4" class="range-slider">
+                        <small class="setting-hint">Number of most relevant academic chunks retrieved (Default: 4)</small>
                     </div>
 
                     <div class="setting-item">
@@ -255,16 +259,16 @@
                             <span class="status-pill online" id="status-ollama-pill">Checking...</span>
                         </div>
                         <div class="system-card">
+                            <span class="card-status-title">Visual Learning Engine</span>
+                            <span class="status-pill online" id="status-visual-pill">Ready (Local Mermaid)</span>
+                        </div>
+                        <div class="system-card">
                             <span class="card-status-title">MongoDB History</span>
                             <span class="status-pill online" id="status-mongo-pill">Checking...</span>
                         </div>
                         <div class="system-card">
                             <span class="card-status-title">Vector Store</span>
                             <span class="status-metric" id="status-vectors-count">0 Vectors</span>
-                        </div>
-                        <div class="system-card">
-                            <span class="card-status-title">Embedding Engine</span>
-                            <span class="status-metric" id="status-embedder-name">all-MiniLM-L6-v2</span>
                         </div>
                     </div>
 
@@ -276,9 +280,26 @@
         </div>
     </div>
 
-    <!-- External Libraries: Marked.js for Markdown & Highlight.js for Code Highlighting -->
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <!-- Diagram Lightbox Modal -->
+    <div class="diagram-modal-overlay hidden" id="diagram-modal">
+        <div class="diagram-modal-header">
+            <h3 id="diagram-modal-title">Diagram Preview</h3>
+            <div class="diagram-modal-controls">
+                <button class="btn-diagram-action" id="diagram-modal-zoom-in" title="Zoom In">🔍 +</button>
+                <button class="btn-diagram-action" id="diagram-modal-zoom-out" title="Zoom Out">🔍 -</button>
+                <button class="btn-diagram-action" id="diagram-modal-reset" title="Reset Zoom">↺ Reset</button>
+                <button class="btn-diagram-action" id="diagram-modal-download-svg" title="Download SVG">📥 Download SVG</button>
+                <button class="btn-diagram-action" id="diagram-modal-download-png" title="Download PNG">🖼️ Download PNG</button>
+                <button class="btn-diagram-action" id="diagram-modal-close" style="font-size:16px;">&times; Close</button>
+            </div>
+        </div>
+        <div class="diagram-modal-content" id="diagram-modal-content"></div>
+    </div>
+
+    <!-- Vendored Offline Frontend Libraries (Zero CDN required) -->
+    <script src="/static/vendor/marked/marked.min.js"></script>
+    <script src="/static/vendor/highlight/highlight.min.js"></script>
+    <script src="/static/vendor/mermaid/mermaid.min.js"></script>
     <!-- App Script -->
     <script src="/static/js/app.js"></script>
 </body>

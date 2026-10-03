@@ -1,0 +1,45 @@
+{
+  "artifact_id": "50a0fa7a-15ff-4903-8618-a13fa3d5e596",
+  "title": "Operating System Process State Transition",
+  "prompt": "Generate a state transition diagram of Operating System process states (New, Ready, Running, Waiting, Terminated).",
+  "artifact_type": "diagram",
+  "diagram_type": "stateDiagram-v2",
+  "mermaid_code": "stateDiagram-v2\n\n[] New --> Ready\nReady --> Running\nRunning --> Waiting\nWaiting --> Terminated\nTerminated --> Closed\n\nSubgraph Process Creation\nNew --> [Create]\n\nSubgraph Scheduling\nReady --> [Scheduling]\nRunning --> [Scheduling]\n\nSubgraph Resource Contention\nWaiting --> [Resource Contention]\n\nSubgraph Termination\nTerminated --> [Termination]\n\nSubgraph Debugging\nTerminated --> [Debugging]",
+  "explanation": "This state diagram illustrates the lifecycle of an operating system process, showing the transition between key states: New, Ready, Running, Waiting, and Terminated. The diagram demonstrates how processes move through these states based on system resources, scheduling, and event-driven behavior. Key concepts include process creation, scheduling, resource contention, and termination.",
+  "grounding_status": "grounded",
+  "source_references": [
+    {
+      "document": "R23-3rd-Year-B.Tech-CSEAI-and-ML.pdf",
+      "page": 6,
+      "score": 0.5453
+    },
+    {
+      "document": "Operating_Systems_Notes.pdf",
+      "page": 3,
+      "score": 0.4555
+    },
+    {
+      "document": "Operating_Systems_Notes.pdf",
+      "page": 1,
+      "score": 0.4522
+    },
+    {
+      "document": "Operating_Systems_Notes.pdf",
+      "page": 2,
+      "score": 0.4375
+    }
+  ],
+  "validation_status": "valid",
+  "created_at": "2026-10-03T06:23:38.392832+00:00",
+  "error_message": null,
+  "image_path": null,
+  "width": null,
+  "height": null,
+  "backend": null,
+  "metadata": {
+    "model": "qwen3:1.7b",
+    "retrieved_chunks_count": 4
+  },
+  "success": true,
+  "mermaid": "stateDiagram-v2\n\n[] New --> Ready\nReady --> Running\nRunning --> Waiting\nWaiting --> Terminated\nTerminated --> Closed\n\nSubgraph Process Creation\nNew --> [Create]\n\nSubgraph Scheduling\nReady --> [Scheduling]\nRunning --> [Scheduling]\n\nSubgraph Resource Contention\nWaiting --> [Resource Contention]\n\nSubgraph Termination\nTerminated --> [Termination]\n\nSubgraph Debugging\nTerminated --> [Debugging]"
+}

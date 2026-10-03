@@ -1,0 +1,28 @@
+{
+  "artifact_id": "407d55b3-9c02-4440-ad1f-7c67e4f10ca8",
+  "title": "TCP 3-Way Handshake Workflow",
+  "prompt": "Show TCP handshake diagram",
+  "artifact_type": "diagram",
+  "diagram_type": "sequenceDiagram",
+  "mermaid_code": "sequenceDiagram\nClient->>Server: SYN\nServer->>Client: SYN-ACK\nClient->>Server: ACK",
+  "explanation": "Client and server exchange SYN, SYN-ACK, ACK packets to establish reliable state.",
+  "grounding_status": "grounded",
+  "source_references": [
+    {
+      "document": "Networking_Course.pdf",
+      "page": 105,
+      "score": 0.88
+    }
+  ],
+  "validation_status": "valid",
+  "created_at": "2026-10-03T03:17:47.353345+00:00",
+  "error_message": null,
+  "image_path": null,
+  "width": null,
+  "height": null,
+  "backend": null,
+  "metadata": {
+    "model": "qwen3:1.7b",
+    "retrieved_chunks_count": 1
+  }
+}

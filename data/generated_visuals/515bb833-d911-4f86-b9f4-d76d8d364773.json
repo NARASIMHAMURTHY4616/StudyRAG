@@ -1,0 +1,40 @@
+{
+  "artifact_id": "515bb833-d911-4f86-b9f4-d76d8d364773",
+  "title": "TCP Three-Way Handshake and Connection Teardown",
+  "prompt": "Generate a sequence diagram of the TCP three-way handshake and connection teardown process.",
+  "artifact_type": "diagram",
+  "diagram_type": "sequenceDiagram",
+  "mermaid_code": "sequenceDiagram\n\ntcpClient->>tcpServer: SYN\n\ttcpServer-->>tcpClient: SYN-ACK\n\ntcpClient-->>tcpServer: ACK\n\ttcpServer-->>tcpClient: ACK\n\n\ttcpClient-->>tcpServer: FIN\n\t\ttcpServer-->>tcpClient: FIN-ACK\n\ntcpClient-->>tcpServer: CLOSE\n\t\ttcpServer-->>tcpClient: CLOSE-ACK\n\ntcpClient-->>tcpServer: ACK\n\t\ttcpServer-->>tcpClient: ACK\n\n\t\ttcpClient-->>tcpServer: FIN\n\t\t\ttcpServer-->>tcpClient: FIN-ACK\n\t\t\ttcpClient-->>tcpServer: ACK\n\n\t\t\ttcpServer-->>tcpClient: ACK\n\t\t\ttcpClient-->>tcpServer: CLOSE\n\t\t\t\ttcpServer-->>tcpClient: CLOSE-ACK\n\t\t\t\ttcpClient-->>tcpServer: ACK",
+  "explanation": "This sequence diagram illustrates the TCP three-way handshake and connection teardown process. The diagram shows the interaction between a client and a server to establish a connection and the subsequent termination of the connection. Key components include the client sending a SYN packet, the server responding with a SYN-ACK, and the client sending an ACK to complete the handshake. The teardown process involves the client closing the connection and the server acknowledging the closure.",
+  "grounding_status": "grounded",
+  "source_references": [
+    {
+      "document": "Operating_Systems_Notes.pdf",
+      "page": 2,
+      "score": 0.3257
+    },
+    {
+      "document": "Operating_Systems_Notes.pdf",
+      "page": 1,
+      "score": 0.3192
+    },
+    {
+      "document": "cybersecurity_project_ideas.pdf",
+      "page": 1,
+      "score": 0.3015
+    }
+  ],
+  "validation_status": "valid",
+  "created_at": "2026-10-03T06:29:09.612485+00:00",
+  "error_message": null,
+  "image_path": null,
+  "width": null,
+  "height": null,
+  "backend": null,
+  "metadata": {
+    "model": "qwen3:1.7b",
+    "retrieved_chunks_count": 4
+  },
+  "success": true,
+  "mermaid": "sequenceDiagram\n\ntcpClient->>tcpServer: SYN\n\ttcpServer-->>tcpClient: SYN-ACK\n\ntcpClient-->>tcpServer: ACK\n\ttcpServer-->>tcpClient: ACK\n\n\ttcpClient-->>tcpServer: FIN\n\t\ttcpServer-->>tcpClient: FIN-ACK\n\ntcpClient-->>tcpServer: CLOSE\n\t\ttcpServer-->>tcpClient: CLOSE-ACK\n\ntcpClient-->>tcpServer: ACK\n\t\ttcpServer-->>tcpClient: ACK\n\n\t\ttcpClient-->>tcpServer: FIN\n\t\t\ttcpServer-->>tcpClient: FIN-ACK\n\t\t\ttcpClient-->>tcpServer: ACK\n\n\t\t\ttcpServer-->>tcpClient: ACK\n\t\t\ttcpClient-->>tcpServer: CLOSE\n\t\t\t\ttcpServer-->>tcpClient: CLOSE-ACK\n\t\t\t\ttcpClient-->>tcpServer: ACK"
+}

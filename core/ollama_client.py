@@ -94,14 +94,24 @@ class OllamaClient:
         prompt: str,
         model: Optional[str] = None,
         think: Optional[bool] = None,
+        max_tokens: Optional[int] = None,
+        temperature: Optional[float] = None,
     ) -> str:
         """
         Send a prompt to Ollama and return the generated text synchronously.
         """
-        payload = self._build_payload(prompt, model=model, stream=False, think=think)
+        payload = self._build_payload(
+            prompt,
+            model=model,
+            stream=False,
+            think=think,
+            max_tokens=max_tokens,
+            temperature=temperature,
+        )
         active_model = payload["model"]
+        active_tokens = payload["options"]["num_predict"]
 
-        logger.info(f"Sending prompt to Ollama model '{active_model}' (think={payload.get('think')}, max_tokens={self.max_tokens})")
+        logger.info(f"Sending prompt to Ollama model '{active_model}' (think={payload.get('think')}, max_tokens={active_tokens})")
         t_start = time.perf_counter()
 
         with OllamaClient._generation_lock:

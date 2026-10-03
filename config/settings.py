@@ -44,6 +44,16 @@ TARGET_CHUNKS_PER_PAGE = int(os.getenv("TARGET_CHUNKS_PER_PAGE", "3"))
 CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "50"))
 CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "700"))
 
+# Visual Learning Engine Configuration (V2.2)
+VISUAL_LEARNING_ENABLED = os.getenv("VISUAL_LEARNING_ENABLED", "true").lower() in ("true", "1", "yes")
+VISUAL_IMAGE_GENERATION_ENABLED = os.getenv("VISUAL_IMAGE_GENERATION_ENABLED", "false").lower() in ("true", "1", "yes")
+GENERATED_VISUALS_DIR = BASE_DIR / os.getenv("GENERATED_VISUALS_DIR", "data/generated_visuals")
+VISUAL_MAX_PROMPT_LENGTH = int(os.getenv("VISUAL_MAX_PROMPT_LENGTH", "1000"))
+VISUAL_MAX_OUTPUT_TOKENS = int(os.getenv("VISUAL_MAX_OUTPUT_TOKENS", "1024"))
+VISUAL_ALLOWED_FORMATS = os.getenv("VISUAL_ALLOWED_FORMATS", "svg,mermaid,json,png").split(",")
+MERMAID_ASSET_PATH = os.getenv("MERMAID_ASSET_PATH", "/static/vendor/mermaid/mermaid.min.js")
+IMAGE_GENERATION_BACKEND = os.getenv("IMAGE_GENERATION_BACKEND", "none").lower()
+
 # Storage Directories
 DOCUMENT_DIR = BASE_DIR / os.getenv("DOCUMENT_DIR", "data/documents")
 CHUNK_DIR = BASE_DIR / os.getenv("CHUNK_DIR", "data/chunks")
@@ -64,7 +74,8 @@ DEBUG_PERFORMANCE = os.getenv("DEBUG_PERFORMANCE", "true").lower() in ("true", "
 # Auto-create all required data directories
 def ensure_directories():
     """Ensure all runtime directories exist."""
-    for directory in [DOCUMENT_DIR, CHUNK_DIR, EMBEDDING_DIR, VECTOR_DB_DIR]:
+    for directory in [DOCUMENT_DIR, CHUNK_DIR, EMBEDDING_DIR, VECTOR_DB_DIR, GENERATED_VISUALS_DIR]:
         directory.mkdir(parents=True, exist_ok=True)
 
 ensure_directories()
+

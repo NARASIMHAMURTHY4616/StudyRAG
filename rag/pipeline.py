@@ -69,9 +69,54 @@ class RAGPipeline:
         self,
         retriever: Optional[Retriever] = None,
         ollama_client: Optional[OllamaClient] = None,
+        diagram_service: Optional[Any] = None,
     ):
         self.retriever = retriever or Retriever()
         self.ollama_client = ollama_client or OllamaClient()
+        self._diagram_service = diagram_service
+
+    @property
+    def diagram_service(self):
+        """Lazy-loaded DiagramService singleton."""
+        if self._diagram_service is None:
+            from visual_learning.diagram_service import DiagramService
+            self._diagram_service = DiagramService(ollama_client=self.ollama_client)
+        return self._diagram_service
+
+    def generate_visual_explanation(
+        self,
+        question: str,
+        preferred_diagram_type: Optional[str] = None,
+        conversation_history: Optional[List[Dict[str, Any]]] = None,
+        top_k: int = settings.TOP_K,
+        min_similarity: float = settings.MIN_SIMILARITY,
+        model: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Generate an educational diagram grounded in retrieved study material passages.
+        """
+        query = question.strip()
+        if not query:
+            return {
+                "error": "Question is required.",
+                "status": "error",
+            }
+
+        enriched_search_query = enrich_query_with_history(query, conversation_history)
+        retrieved_chunks = self.retriever.retrieve(
+            query=enriched_search_query,
+            top_k=top_k,
+            min_similarity=min_similarity,
+        )
+
+        artifact = self.diagram_service.generate_diagram(
+            question=query,
+            retrieved_chunks=retrieved_chunks,
+            preferred_diagram_type=preferred_diagram_type,
+            conversation_history=conversation_history,
+            model=model,
+        )
+        return artifact.to_dict()
 
     def _extract_sources(self, retrieved_chunks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Extract unique verified source citations from retrieved chunks."""

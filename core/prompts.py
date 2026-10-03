@@ -107,13 +107,14 @@ def build_rag_prompt(
             page = chunk.get("page_number") or chunk.get("page", "?")
             text = (chunk.get("chunk_text") or chunk.get("text", "")).strip()
 
-            # Deduplicate near-identical chunk texts
+            # Deduplicate exact chunk texts within same doc/page
             norm_text = " ".join(text.split())
-            if norm_text in seen_texts:
+            dedup_key = (str(source), str(page), norm_text)
+            if dedup_key in seen_texts:
                 continue
-            seen_texts.add(norm_text)
+            seen_texts.add(dedup_key)
 
-            block = f"[Source {len(context_blocks) + 1}]\nDocument: {source}\nPage: {page}\nContent:\n{text}"
+            block = f"[Source {len(context_blocks) + 1}]\nDocument: {source} (Page {page})\nPage: {page}\nContent:\n{text}"
             block_len = len(block)
 
             # Check context budget: do not split chunks mid-text if avoidable
