@@ -1,0 +1,20 @@
+device : battery_BATO
+type  : Laptop battery
+vendor :BYD
+model : DELLK3JK96B
+serial number : 120
+refreshed     : 18 seconds
+present       : yes
+rechaegable   : yes
+state     : charging 
+energy :   11.2 wh
+energy when empty : 0.0 wh
+energy when full : 36.6 wh
+energy (design)  : 62.0 wh
+rate             : 17.5 w
+voltage          : 7.9 v
+time to full     : 1.4 hour
+time to empty    : 0 seconds
+percentage       : 31.0 %
+capacicy         : 59.0 %
+technology       : lithium ion 

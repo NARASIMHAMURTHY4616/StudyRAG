@@ -1,0 +1,32 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Virtual environment
+.venv/
+venv/
+ENV/
+env/
+
+# Environment variables
+.env
+
+# Data directories (except gitkeep if any)
+data/chunks/*
+data/embeddings/*
+data/vector_db/*
+!data/documents/.gitkeep
+!data/chunks/.gitkeep
+!data/embeddings/.gitkeep
+!data/vector_db/.gitkeep
+
+# IDE and OS files
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.log
