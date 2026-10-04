@@ -1,270 +1,816 @@
-# StudyRAG v2.2 — Local Offline Study Assistant & Visual Learning Engine
+# StudyRAG — Offline Local AI Study Assistant
 
-**StudyRAG v2.2** is an offline-first, local Retrieval-Augmented Generation (RAG) system engineered for university students and academic researchers. It combines accurate document-grounded text answers with an integrated **Visual Learning Engine** that generates technically accurate Mermaid diagrams and educational illustrations using local AI—with zero reliance on cloud APIs or public CDNs.
+> **StudyRAG** is an offline-first, locally hosted AI study assistant designed to help students learn from their own academic materials. It combines document ingestion, retrieval-augmented generation (RAG), local language models, source-aware answers, and a visual-learning engine for technical diagrams.
+
+**Project status:** Active development  
+**Current development line:** v2.2 / v2.3 visual-learning improvements (see [Version History](#version-history))  
+**Primary goal:** Keep normal study and RAG workflows local, private, and usable on modest hardware.
 
 ---
 
-## 🏗️ Architecture Diagram
+## Table of contents
+
+- [Overview](#overview)
+- [Project goals](#project-goals)
+- [Key features](#key-features)
+- [How StudyRAG works](#how-studyrag-works)
+- [Technology stack](#technology-stack)
+- [Visual Learning Engine](#visual-learning-engine)
+- [Version history](#version-history)
+- [Architecture](#architecture)
+- [Project structure](#project-structure)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Running StudyRAG](#running-studyrag)
+- [Adding study materials](#adding-study-materials)
+- [API overview](#api-overview)
+- [Privacy and offline operation](#privacy-and-offline-operation)
+- [Performance notes](#performance-notes)
+- [Troubleshooting](#troubleshooting)
+- [Testing](#testing)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
+- [Security](#security)
+- [License](#license)
+- [Acknowledgements](#acknowledgements)
+
+---
+
+## Overview
+
+StudyRAG is a local AI study assistant that can use academic documents—such as syllabus files, lecture notes, textbooks, previous examination papers, lab manuals, and PDFs—to help answer study questions.
+
+Rather than relying only on a model's general knowledge, the RAG workflow retrieves relevant passages from a user's local material and supplies those passages to a local language model. Where supported by the application, answers and generated learning artifacts can include document names and page references.
+
+StudyRAG is intended to grow into a portable, resource-conscious study tool that can operate without paid cloud AI APIs during normal use.
+
+### What it is
+
+- A local academic assistant built around retrieval and grounded generation.
+- A document-based study workflow for PDFs and other supported academic resources.
+- A platform for explanations, revision, and technical diagrams.
+- A modular project that can add optional local visual-generation backends over time.
+
+### What it is not
+
+- It is not guaranteed to answer every question correctly.
+- A citation does not automatically prove that a statement is supported; sources should be checked.
+- Mermaid diagrams are structured technical diagrams, not photorealistic AI-generated images.
+- Optional AI image generation is **not considered available** unless a compatible local image model is installed and verified.
+
+---
+
+## Project goals
+
+1. **Local-first AI:** Use local models and local storage for normal RAG operations.
+2. **Grounded answers:** Retrieve relevant academic content and retain source metadata.
+3. **Useful citations:** Preserve document names and page numbers when available.
+4. **Modular architecture:** Keep ingestion, retrieval, generation, and visualization responsibilities separate.
+5. **Resource awareness:** Support modest CPU/RAM systems and avoid unnecessary model downloads.
+6. **Visual learning:** Generate useful technical diagrams and, in a future/optional path, support real local AI illustrations.
+7. **Maintainability:** Add tests, clear configuration, documentation, and explicit error states.
+
+---
+
+## Key features
+
+Feature availability depends on the version and the code currently present in the repository.
+
+| Feature | Description | Status |
+|---|---|---|
+| Local LLM integration | Communicates with a local Ollama model | Implemented in development |
+| PDF ingestion | Extracts text and page information from PDFs | Project capability; verify current ingestion path |
+| Text chunking | Splits material into retrieval-friendly passages | Project capability; verify current implementation |
+| Local embeddings | Embeds document chunks locally | Project capability; verify configured embedding model |
+| Vector retrieval | Uses a local vector store such as FAISS where configured | Project capability; verify current configuration |
+| Grounded answers | Supplies retrieved passages to the local model | Implemented in the RAG workflow; verify current routes |
+| Source metadata | Tracks document/page information when available | Supported by the visual/RAG workflow |
+| Mermaid technical diagrams | Creates flowcharts, sequence diagrams, and state diagrams | In development; diagram-type and rendering fixes may be required |
+| SVG export | Export rendered diagrams | Verify in the running version |
+| PNG export | Convert rendered diagrams to PNG | Optional; verify browser conversion support |
+| Conversation history | Conversation-related API is present in development logs | Verify persistence and UI behavior |
+| Local AI image generation | Generates raster illustrations using a local image model | Planned/optional; not available unless a backend is installed and tested |
+| Offline operation | Avoids cloud AI calls in the normal local workflow | Design goal; verify all runtime dependencies and assets are local |
+
+**Documentation note:** This README describes the intended project and development history. Check the actual repository before treating a feature as production-ready.
+
+---
+
+## How StudyRAG works
+
+### RAG workflow
 
 ```text
-                                STUDYRAG v2.2
-                        
-  Uploaded Academic PDF ──► PyMuPDF Page-Aware Loader
-                                    │
-                                    ▼
-                             Text Chunker (~3 chunks/page)
-                                    │
-                                    ▼
-                   Sentence-Transformers (all-MiniLM-L6-v2)
-                                    │
-                                    ▼
-                    FAISS Local Vector Store (IndexFlatIP)
-                                    │
-                                    ├──────────────────────────┐
-                                    ▼                          ▼
-                          Text RAG Stream             Visual Learning Engine
-                                    │                          │
-                                    ▼                          ▼
-   User Question / ──► Semantic Cosine Retrieval ──► Grounded Diagram Prompt
-   Diagram Request                  │                          │
-                                    ▼                          ▼
-                          Grounded Prompt          Local Ollama (Qwen3:1.7B)
-                                    │                          │
-                                    ▼                          ▼
-                       Local Ollama Generation      Diagram Validator & Repair
-                                    │                          │
-                                    ▼                          ▼
-                       Streaming Academic Answer    Validated Mermaid AST & SVG
-                                    │                          │
-                                    └────────────┬─────────────┘
-                                                 ▼
-                                     Web UI / Terminal / Export
-                             (Interactive Mermaid, Citations, SVG/PNG)
+Academic PDFs / Notes / Textbooks
+                |
+                v
+        Document Ingestion
+                |
+                v
+      Text Extraction + Cleanup
+                |
+                v
+       Academic-Aware Chunking
+                |
+                v
+      Local Embedding Generation
+                |
+                v
+       Local Vector Store (FAISS)
+                |
+                v
+           User Question
+                |
+                v
+       Retrieve Relevant Chunks
+                |
+                v
+     Local Ollama Language Model
+                |
+                v
+     Answer + Available Citations
 ```
 
----
+The exact ingestion, embedding, storage, and retrieval components depend on the current repository configuration.
 
-## 🚀 What's New in V2.2: Visual Learning Engine
+### Visual-learning workflow
 
-1. **Intelligent Diagram Generation (Objective A)**:
-   - Request diagrams for university computer science and academic concepts:
-     - **Protocols & Networks**: TCP 3-way handshake, OSI model layers, DNS lookup flow (`sequenceDiagram`).
-     - **Operating Systems**: Process lifecycle & state transitions, CPU scheduling queues, deadlock conditions (`stateDiagram-v2`, `flowchart`).
-     - **Automata & Compilers**: DFA/NFA state-transition machines, compiler pipeline phases (`stateDiagram-v2`, `flowchart`).
-     - **Databases & Architecture**: Relational schemas, ER diagrams, Cloud/IoT microservices (`erDiagram`, `flowchart`).
-     - **Cybersecurity & AI**: Safe educational attack/defense lifecycles, ML/RAG pipelines (`flowchart`).
+```text
+                    User request
+                         |
+                         v
+                 Visual Learning Engine
+                    /           \
+                   v             v
+          Technical diagram   Illustration request
+                   |             |
+                   v             v
+               Mermaid.js    Optional local image model
+                   |             |
+                   v             v
+                  SVG          PNG/JPEG
+```
 
-2. **RAG-Grounded Visual Explanations (Objective B)**:
-   - When study materials match the query, diagrams are generated using exact technical passages and labeled as **"📄 Grounded in Study Material"** with verified document & page citations.
-   - When no study materials match, diagrams are generated from foundational curriculum knowledge and labeled as **"🌐 General Academic Knowledge"**.
-   - Citations are strictly extracted from verified retrieval chunks and never fabricated by the model.
-
-3. **100% Offline Local Mermaid Rendering (Objective D & E)**:
-   - Vendored, MIT-licensed Mermaid.js (`v10.9.1`) served locally—zero CDN dependencies.
-   - Runs in strict security mode (`securityLevel: 'strict'`), disabling unsafe HTML execution or scripts.
-   - Bounded syntax validator with automatic single-pass repair if the local model outputs malformed syntax.
-
-4. **Diagram Export & Interactive Viewing**:
-   - One-click **SVG download** (sanitized server-side) and high-DPI **PNG download** (client-side canvas).
-   - One-click **Copy Mermaid code** for use in reports or Markdown notes.
-   - Fullscreen **Lightbox Viewer** with zoom-in (+), zoom-out (-), and reset controls.
-
-5. **Optional AI Illustration Abstraction (Objective C)**:
-   - Decoupled `ImageGenerationBackend` interface supporting local text-to-image backends (`Diffusers`, `ComfyUI`).
-   - Disabled by default with honest diagnostic reporting (`GET /api/visualize/status`).
-   - Does not treat text LLMs (`qwen3:1.7b`) as image models and does not download multi-gigabyte models automatically.
-
-6. **Hardware Efficiency**:
-   - Operates comfortably on modest hardware (e.g., Intel Core i5-6300U, 8 GB RAM, Integrated GPU).
-   - Diagram generation requires zero GPU and adds no second large language model.
+The Mermaid path can create structured technical diagrams. The illustration path requires a separate compatible image-generation backend; it must not be simulated by returning a Mermaid SVG.
 
 ---
 
-## 🧠 Model Architecture & Component Roles
+## Technology stack
 
-| Component | Model / Engine | Host / Location | Purpose |
-|---|---|---|---|
-| **Embedding Engine** | `all-MiniLM-L6-v2` | Sentence-Transformers (CPU) | Vectorizes chunks and queries into 384-dimensional normalized dense vectors. |
-| **Vector Store** | FAISS `IndexFlatIP` | Local Disk (`data/vector_db/`) | High-speed local cosine similarity indexing with SHA-256 duplicate detection. |
-| **Generation Model** | `qwen3:1.7b` | Ollama (`http://localhost:11434`) | Generates grounded explanations and Mermaid diagram ASTs. |
-| **Visual Renderer** | Mermaid.js `10.9.1` | Local Static Asset (`static/vendor/`) | Client-side strict-mode SVG rendering. |
-| **Conversation Store** | MongoDB / Memory | `localhost:27017` / RAM Cache | Stores multi-turn chat threads, diagram artifacts, and citations. |
+| Technology | Purpose |
+|---|---|
+| Python | Backend and application logic |
+| Flask | Web application and API routes |
+| Ollama | Runs local language models |
+| Qwen3:1.7B | Current small local language model used during development |
+| PyMuPDF | PDF text extraction, where used |
+| Sentence Transformers | Local embedding generation, where configured |
+| FAISS | Local vector similarity search, where configured |
+| Mermaid.js | Browser rendering of technical diagrams |
+| HTML, CSS, JavaScript | User interface and browser behavior |
+| JSON | Visual-artifact metadata and other structured data |
+| pytest / existing test tools | Automated tests, depending on project setup |
+
+Dependencies and exact versions should be taken from `requirements.txt`, lock files, and the actual code—not inferred from this README.
+
+### Current local model
+
+The development setup has used:
+
+- **Runtime:** Ollama
+- **Model:** `qwen3:1.7b`
+
+This is a compact text model, not an image-generation model. Quality, speed, and valid structured output depend on prompt design, model output, decoding settings, and validation. A successful model response does not guarantee valid Mermaid syntax.
 
 ---
 
-## 📁 Project Structure
+## Visual Learning Engine
+
+The visual system has two separate output types.
+
+### 1. Technical diagrams — Mermaid.js
+
+Suitable for:
+
+- TCP handshakes and connection teardown
+- Operating-system process states
+- Network topologies
+- Compiler pipelines
+- Algorithms and flowcharts
+- Component relationships
+- Sequence diagrams
+
+Typical pipeline:
+
+```text
+Question -> Local model -> Structured response -> Mermaid source
+         -> Validation -> Mermaid.js -> Rendered SVG
+```
+
+Supported diagram types targeted by the current development work:
+
+- `flowchart`
+- `sequenceDiagram`
+- `stateDiagram-v2`
+
+The source must be valid for its selected diagram type. For example, state transitions use `New --> Ready : Admit`; they should not be represented as `[New]--[Admit]--[Ready]`.
+
+#### Required reliability behavior
+
+- Parse the model response into structured fields.
+- Store Mermaid source in the dedicated `mermaid_code` field.
+- Keep the explanation as readable prose.
+- Reject empty or obviously incomplete source.
+- Handle Mermaid rendering errors and clear the loading state.
+- Keep source code separate from the normal rendered view.
+- Preserve grounding status and source references.
+- Do not mark an artifact valid merely because the API returned HTTP 200.
+
+### 2. Real AI-generated illustrations — optional future backend
+
+Examples:
+
+- An educational illustration of CPU cache hierarchy
+- A conceptual illustration of how a firewall works
+- A visual representation of a cybersecurity operations center
+
+This requires a separate local image-generation model and compatible runtime. It may require substantial RAM, disk space, and compute resources.
+
+**Current status:** Planned/optional unless a real backend has been installed and successfully tested. Do not describe image generation as working merely because a Mermaid diagram was created.
+
+### Visual artifact metadata
+
+An artifact may include fields such as:
+
+- `artifact_id`
+- `title`
+- `prompt`
+- `artifact_type`
+- `diagram_type`
+- `mermaid_code`
+- `explanation`
+- `grounding_status`
+- `source_references`
+- `validation_status`
+- `error_message`
+- `created_at`
+- `metadata`
+
+The actual schema in the repository is authoritative. Existing artifacts may use different field names or older formats.
+
+---
+
+## Version history
+
+The version history below records the development stages and intended capabilities discussed for StudyRAG. It is **not a claim that every feature in every version has been merged, tested, or released**. Confirm tags, branches, and commits in Git before publishing release claims.
+
+### v1.0 — Core local RAG foundation
+
+**Goal:** Establish the base offline study-assistant workflow.
+
+Planned/core capabilities:
+- Initial Flask application structure
+- Local Ollama integration
+- PDF/document ingestion path
+- Text cleaning and chunking
+- Local embeddings and vector retrieval
+- Retrieval-grounded responses
+
+**Release status:** Historical foundation; confirm exact implementation from repository history.
+
+### v1.1 — Ingestion and retrieval improvements
+
+**Goal:** Improve document processing and source-aware retrieval.
+
+Development scope:
+- More reliable PDF ingestion
+- Academic-friendly chunking
+- Local embedding persistence
+- Retrieval integration with Ollama
+- Improved source/page metadata handling
+- Tests and clearer module boundaries
+
+**Release status:** Development milestone; verify the implementation and release tag.
+
+### v2.0 — Visual Learning Engine foundation
+
+**Goal:** Introduce generated technical diagrams into the study workflow.
+
+Development scope:
+- Visual request handling
+- Diagram-generation service
+- Mermaid source generation
+- Visual artifact storage
+- API and frontend integration
+- Grounding metadata for visual artifacts
+
+**Release status:** Development milestone; confirm the merged code.
+
+### v2.1 — Artifact validation and UI integration
+
+**Goal:** Make diagram generation more structured and robust.
+
+Development scope:
+- Structured model responses
+- Separate artifact fields for title, Mermaid source, and explanation
+- Artifact validation status
+- Error metadata
+- Diagram-card rendering
+- SVG/PNG and copy-code controls where implemented
+
+**Known concern:** Model output may be malformed or stored in the wrong field unless parsing and validation are correctly implemented.
+
+### v2.2 — Visual Learning Engine improvements
+
+**Goal:** Stabilize the visual pipeline without rebuilding the project.
+
+Development scope:
+- Audit existing architecture before changes
+- Local Mermaid asset integration
+- Improved rendering and error handling
+- RAG-grounded diagram generation
+- Artifact persistence
+- Export controls
+- Tests and documentation
+- Resource-conscious implementation
+
+**Known issues observed during development:**
+- A generated artifact had an empty `mermaid_code` field.
+- The model's JSON response was incorrectly stored as a string in `explanation`.
+- The model emitted a state diagram with invalid syntax.
+- A TCP sequence diagram appeared visually flattened and required investigation of its source, SVG, DOM, and CSS.
+
+These observations mean the visual pipeline still requires verification; they should not be presented as resolved without tests.
+
+### v2.3 — Diagram-type-aware generation and image-backend architecture
+
+**Goal:** Correct diagram-type-specific generation and prepare an optional path for actual AI image generation.
+
+Planned scope:
+- Separate rules for flowcharts, sequence diagrams, and state diagrams
+- Structured output parsing
+- Type-aware validation
+- Reliable SVG rendering
+- Clear failure states and bounded retries
+- A visual router that distinguishes technical diagrams from illustrations
+- Capability detection for local image-generation backends
+- Optional image artifact storage and metadata
+- No automatic large model downloads
+
+**Release status:** Planned/development target. Only mark it released after implementation, tests, and actual browser verification.
+
+### Future releases
+
+Potential future work:
+- More diagram types
+- Better retrieval evaluation
+- Improved source attribution and answer verification
+- Document management UI
+- Portable deployment
+- Optional, tested local image generation
+- Export and accessibility improvements
+- Performance and memory profiling
+
+### How to verify the installed version
+
+From the repository directory:
+
+```bash
+git status
+git log -10 --oneline --decorate
+git tag --list
+```
+
+If the application exposes a version constant or package metadata, use that as well. Do not infer the installed version solely from this README.
+
+---
+
+## Architecture
+
+A conceptual modular layout:
 
 ```text
 StudyRAG/
-├── app.py                      # Flask web application entry point with V2.2 visual routes
-├── requirements.txt            # Minimal local dependencies
-├── README.md                   # Complete documentation
-├── .env.example                # Environment variable configuration template
-│
+├── app.py
 ├── config/
-│   └── settings.py             # Config defaults, visual learning toggles, and directories
-│
-├── visual_learning/            # Visual Learning Engine Package (V2.2)
-│   ├── __init__.py
-│   ├── schemas.py              # VisualArtifact, GroundingStatus, ValidationStatus dataclasses
-│   ├── exceptions.py           # Custom visual learning exception hierarchy
-│   ├── prompt_templates.py     # Diagram generation & bounded repair prompts
-│   ├── diagram_validator.py    # AST syntax validation, fence stripping, & sanitization
-│   ├── diagram_service.py      # Diagram generation orchestrator & RAG grounding
-│   ├── storage.py              # Visual artifact persistence, SVG sanitization, path security
-│   ├── image_backends.py       # Extensible image generation backend abstractions
-│   └── image_service.py        # Educational illustration service layer
-│
 ├── core/
-│   ├── ollama_client.py        # Local Ollama HTTP client with streaming & lock
-│   ├── prompts.py              # Grounding prompts & context budgeting
-│   └── performance.py          # Latency, TTFT, and metric tracking
-│
+│   └── ollama_client.py
 ├── ingestion/
-│   ├── pdf_loader.py           # PyMuPDF page-aware loader & SHA-256 hashing
-│   ├── text_cleaner.py         # Whitespace normalization
-│   └── chunker.py              # Academic chunking (~3 chunks/page)
-│
-├── embeddings/
-│   └── embedder.py             # Sentence-Transformers local embedder
-│
-├── vectorstore/
-│   └── local_store.py          # FAISS local vector store & persistence
-│
 ├── retrieval/
-│   └── retriever.py            # Cosine similarity search & threshold filtering
-│
+├── embeddings/
 ├── rag/
-│   └── pipeline.py             # End-to-end RAG & visual explanation orchestrator
-│
-├── database/
-│   ├── mongo.py                # MongoDB connection manager with auto-reconnect
-│   └── conversations.py        # Multi-turn conversation lifecycle & memory fallback
-│
-├── static/
-│   ├── css/style.css           # Modern ChatGPT-style stylesheet with diagram card UI
-│   ├── js/app.js               # Frontend controller, Mermaid rendering, SVG/PNG export
-│   └── vendor/                 # 100% Offline Local Libraries (Zero CDN)
-│       ├── mermaid/            # Mermaid.js (v10.9.1, MIT)
-│       ├── marked/             # Marked.js (v12.0.2, MIT)
-│       └── highlight/          # Highlight.js (v11.9.0, BSD-3)
-│
+├── visual_learning/
+│   ├── diagram_service.py
+│   └── storage.py
+├── vectorstore/
 ├── data/
-│   ├── documents/              # Stored PDF study documents
-│   ├── vector_db/              # FAISS index, metadata, & registry
-│   └── generated_visuals/      # Saved diagram artifacts and exported SVGs
-│
-└── tests/                      # Comprehensive Unit & Integration Test Suite (61 tests)
-    ├── test_diagram_validator.py
-    ├── test_diagram_service.py
-    ├── test_visual_storage.py
-    ├── test_image_service.py
-    ├── test_visual_learning_routes.py
-    ├── test_visual_rag_integration.py
-    ├── test_chat_stream.py
-    ├── test_chunker.py
-    ├── test_embedder.py
-    ├── test_embeddings.py
-    ├── test_mongo.py
-    ├── test_ollama_client.py
-    ├── test_pdf_loader.py
-    ├── test_performance.py
-    ├── test_pipeline.py
-    ├── test_prompt_builder.py
-    └── test_retrieval.py
+│   └── generated_visuals/
+├── templates/
+├── static/
+├── tests/
+├── scripts/
+├── requirements.txt
+└── README.md
 ```
+
+This is a conceptual map based on the development structure. The actual repository may contain additional modules or use different names. Inspect the current tree before adding or renaming directories.
+
+### Architectural responsibilities
+
+- **Application/API layer:** Receives requests and coordinates services.
+- **Ingestion:** Extracts and prepares academic document content.
+- **Embeddings:** Converts text into vectors using a local embedding model.
+- **Retrieval:** Finds relevant chunks from local indexed material.
+- **RAG/generation:** Supplies retrieved context to the local LLM.
+- **Visual learning:** Generates and validates diagrams and routes optional illustration requests.
+- **Storage:** Persists indexes, document metadata, conversations, and visual artifacts according to the configured implementation.
+- **Frontend:** Displays answers, citations, diagrams, errors, and available export controls.
+- **Tests:** Validate behavior and prevent regressions.
 
 ---
 
-## 🛠️ Installation & Setup
+## Requirements
 
-### 1. Prerequisites
-* Python 3.10+
-* Ollama installed with `qwen3:1.7b`:
-  ```bash
-  ollama pull qwen3:1.7b
-  ollama serve
-  ```
-* (Optional) MongoDB for persistent conversation storage:
-  ```bash
-  sudo systemctl start mongod
-  ```
-  *Note: If MongoDB is not running, StudyRAG operates seamlessly using an in-memory conversation cache.*
+Baseline requirements depend on the current `requirements.txt` and system setup.
 
-### 2. Virtual Environment & Dependencies
+Typical components:
+
+- Linux, Windows, or another OS supported by the installed dependencies
+- Python version compatible with the project's dependency files
+- Ollama installed and running locally
+- A local text model such as `qwen3:1.7b`
+- Sufficient disk space for Python packages, models, PDFs, and indexes
+- A modern browser for the web UI
+- Local Mermaid JavaScript asset for offline diagram rendering
+
+Optional components, depending on enabled features:
+
+- Embedding model files
+- FAISS index storage
+- Browser support for PNG export
+- A compatible local image-generation runtime and model
+
+---
+
+## Installation
+
+These instructions are a general starting point. Use the repository's actual setup instructions and dependency files when they differ.
+
+### 1. Clone or open the project
+
+If the project is already on your machine:
+
 ```bash
-cd StudyRAG
+cd ~/StudyRAG
+```
+
+Otherwise, clone the repository using its actual remote URL.
+
+### 2. Create a virtual environment
+
+```bash
 python3 -m venv .venv
 source .venv/bin/activate
+```
+
+On Windows PowerShell:
+
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+```
+
+### 3. Install dependencies
+
+```bash
+python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
----
+Review dependency changes before installing if disk space or memory is limited.
 
-## 📖 Usage Guide
+### 4. Install and verify Ollama
 
-### Starting the Web Interface
+Install Ollama using its official installation instructions for your operating system.
+
+Verify it:
+
 ```bash
-python app.py -w
-```
-Open [http://localhost:5000](http://localhost:5000) in your browser:
-1. **Upload Study PDF**: Drag and drop course PDFs (e.g., `Operating_Systems_Notes.pdf`).
-2. **Request Technical Diagrams**:
-   - Click the **"Diagram Mode"** button or ask naturally:
-     - *"Diagram the TCP three-way handshake and connection teardown"*
-     - *"Create a state transition diagram of OS process states"*
-     - *"Show a flowchart of CPU Round Robin scheduling"*
-3. **Inspect Grounded Citations**: Review exact document and page references (e.g. `OS_Notes.pdf — Page 42`).
-4. **Export & View**:
-   - Click **SVG** to download clean vector graphics.
-   - Click **PNG** for raster images.
-   - Click **Fullscreen** to zoom and inspect intricate architectures.
-   - Click **Copy Code** to copy raw Mermaid definition.
-
----
-
-## ⚙️ Configuration Settings
-
-Configure runtime behavior via `.env` or environment variables:
-
-| Setting | Default | Description |
-|---|---|---|
-| `VISUAL_LEARNING_ENABLED` | `true` | Enables/disables diagram generation routes and UI controls. |
-| `VISUAL_IMAGE_GENERATION_ENABLED` | `false` | Enables optional text-to-image AI backends. |
-| `IMAGE_GENERATION_BACKEND` | `none` | Active image backend (`none`, `diffusers`). |
-| `OLLAMA_MODEL` | `qwen3:1.7b` | Local text LLM for answer synthesis and diagram ASTs. |
-| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama HTTP endpoint. |
-| `TOP_K` | `4` | Number of relevant chunks retrieved per query. |
-| `MIN_SIMILARITY` | `0.25` | Minimum cosine similarity threshold. |
-| `GENERATED_VISUALS_DIR` | `data/generated_visuals`| Directory for stored diagram artifacts and SVGs. |
-
----
-
-## 🧪 Running the Test Suite
-
-Execute the complete 61-test verification suite:
-```bash
-pytest -v
+ollama --version
+ollama list
 ```
 
-All 61 tests run offline using mocks for Ollama and isolated temporary directories for FAISS/artifacts without requiring GPU or internet access.
+If the configured model is not installed, download it explicitly when you have sufficient bandwidth and disk space:
+
+```bash
+ollama pull qwen3:1.7b
+```
+
+Do not download a model automatically from application code.
+
+### 5. Verify configuration
+
+Check the project's `.env.example`, configuration files, and README instructions. Configure local model names, data paths, and service addresses as required.
+
+### 6. Start the application
+
+Use the entry point and command supported by the current repository. Common possibilities include:
+
+```bash
+python app.py
+```
+
+or a Flask CLI command, depending on the actual application.
+
+Do not assume a command works without checking the project configuration.
 
 ---
 
-## 🔒 Security Architecture
+## Configuration
 
-1. **Strict Mermaid Sandbox**: Mermaid operates in `securityLevel: 'strict'`, stripping `<script>`, `<iframe>`, `onload`, `onerror`, and inline javascript URIs.
-2. **Path Traversal Defense**: All artifact IDs and export filenames are strictly validated against `^[a-zA-Z0-9_-]{8,64}$` and resolved using strict relative subpath verification.
-3. **Indirect Prompt Injection Defense**: Retrieved study material is enclosed in strict context delimiters, preventing document text from executing commands or overriding system instructions.
-4. **Zero Cloud Inference**: 100% of embeddings, retrieval, LLM generation, AST parsing, and diagram rendering execute locally.
+Use the existing configuration system. Do not hardcode local paths, secrets, or model settings in multiple modules.
+
+Potential settings include:
+
+| Setting | Purpose |
+|---|---|
+| Ollama base URL | Local Ollama API endpoint |
+| Text model name | Model used for generation |
+| Embedding model | Local embedding model |
+| Data directory | Document and artifact storage |
+| Vector-store directory | Location of local index |
+| Maximum context/chunk count | Controls retrieval context size |
+| Generation token limit | Limits model response size |
+| `IMAGE_GENERATION_ENABLED` | Optional image-generation switch |
+| `IMAGE_GENERATION_BACKEND` | Selected local image backend |
+| `IMAGE_GENERATION_MODEL` | Explicit image model identifier |
+
+For an optional image-generation backend, a conservative default is:
+
+```dotenv
+IMAGE_GENERATION_ENABLED=false
+IMAGE_GENERATION_BACKEND=auto
+IMAGE_GENERATION_MODEL=
+```
+
+These are proposed setting names, not a guarantee that they are already implemented. Match the actual names in the code.
+
+Never commit private credentials or machine-specific secrets.
 
 ---
 
-## 📋 Changelog — V2.2
+## Running StudyRAG
 
-* **Visual Learning Engine**: Integrated dedicated `DiagramService`, `DiagramValidator`, `VisualStorageManager`, and `ImageService`.
-* **RAG-Grounded Visuals**: Grounding status classification (`grounded` vs `general_knowledge`) with citation integrity.
-* **Mermaid Local Vendoring**: Local vendoring of Mermaid.js `v10.9.1`, Marked.js, and Highlight.js for true offline usage without CDNs.
-* **Interactive Diagram UI**: Fullscreen modal viewer, SVG/PNG export, copy code, and grounding badges.
-* **Bounded Repair Engine**: Automatic one-pass repair loop for invalid Mermaid syntax.
-* **Test Suite Expansion**: Added 28 new tests covering validators, diagram generation, SVG sanitization, storage security, RAG integration, and visual API routes (61 total passing tests).
+1. Start the local Ollama service.
+2. Confirm the configured model is available.
+3. Activate the Python environment.
+4. Start the Flask application using the repository's supported command.
+5. Open the local address printed by Flask.
+6. Add or index academic documents using the supported ingestion workflow.
+7. Ask a question about the material.
+8. Inspect retrieved sources and page references when provided.
+9. Request a technical diagram and verify that it renders correctly.
+
+A successful HTTP response alone does not prove that an artifact is valid. Confirm that the actual diagram is rendered and that the source is appropriate.
+
+---
+
+## Adding study materials
+
+StudyRAG is intended for materials such as:
+
+- Course syllabi
+- Lecture notes
+- Textbooks
+- Previous question papers
+- Lab manuals
+- Academic PDFs
+- Personal study notes
+
+Recommended workflow:
+
+1. Use the application's supported document-ingestion process.
+2. Confirm that text extraction succeeded.
+3. Confirm that document/page metadata is retained.
+4. Index the processed chunks.
+5. Ask a question that should be answered by the uploaded material.
+6. Check whether the cited document and page actually support the answer.
+
+Scanned PDFs may require OCR if the current ingestion pipeline does not extract text from them. Do not assume OCR is available unless implemented.
+
+---
+
+## API overview
+
+The visual workflow has used an endpoint such as:
+
+```text
+POST /api/visualize
+```
+
+The application has also logged requests to:
+
+```text
+GET /api/conversations
+```
+
+These are observed development endpoints, not a complete API specification.
+
+Before integrating with them, inspect the current Flask routes and request/response schemas. Preserve backward compatibility when changing API contracts.
+
+A visualization response should distinguish:
+
+- Successful generation
+- Invalid diagram source
+- Rendering failure
+- Missing image-generation backend
+- Internal service failure
+
+Never return success for an image unless an actual image file has been generated and saved.
+
+---
+
+## Privacy and offline operation
+
+StudyRAG is designed to keep normal study workflows local.
+
+- Local Ollama inference can avoid sending prompts to cloud LLM providers.
+- Local embeddings and vector indexes can avoid external embedding APIs.
+- Local document storage keeps study files under the user's control.
+- Mermaid rendering can work offline when its JavaScript asset is served locally.
+- Optional image generation should use a compatible local backend if offline operation is required.
+
+**Offline-first does not automatically mean every dependency is offline.** Verify browser assets, package installation, model downloads, analytics, and optional services. Downloads during installation require network access, but normal operation should not need cloud inference if the application is configured correctly.
+
+---
+
+## Performance notes
+
+The target development laptop has approximately 8 GB RAM and an Intel i5-6300U CPU with integrated graphics.
+
+Recommended practices:
+
+- Keep the current compact text model unless profiling demonstrates a clear need to change it.
+- Limit retrieval context and generation token counts.
+- Avoid loading multiple large models simultaneously.
+- Avoid automatic model downloads.
+- Cache local embeddings and indexes where safe.
+- Keep retries bounded.
+- Prefer lightweight diagram rendering for technical content.
+- Make image generation optional and disabled by default until a compatible backend is tested.
+- Measure actual memory and response time instead of promising a particular speed.
+
+CPU-only AI image generation can be slow and memory-intensive. Check the chosen model's actual requirements before installing it.
+
+---
+
+## Troubleshooting
+
+### Ollama is not responding
+
+```bash
+ollama list
+```
+
+Confirm Ollama is running and the configured model is available. Inspect application logs for connection errors.
+
+### Diagram card stays on “Rendering diagram…”
+
+Inspect:
+
+1. Browser Developer Tools → Console.
+2. Developer Tools → Network → the visualization API response.
+3. The exact Mermaid source saved in the artifact.
+4. The installed Mermaid version and browser asset.
+5. The generated SVG and its container dimensions.
+
+Ensure the frontend clears its loading state on both success and failure.
+
+### `mermaid_code` is empty
+
+Inspect the model-response parser. The model's JSON may have been stored inside the explanation field rather than parsed into dedicated artifact fields. Validate the extracted source before saving the artifact.
+
+### State diagram parse error
+
+Use Mermaid state-diagram syntax, for example:
+
+```mermaid
+stateDiagram-v2
+    New --> Ready : Admit
+    Ready --> Running : Dispatch
+    Running --> Waiting : I/O Wait
+    Waiting --> Ready : I/O Complete
+    Running --> Terminated : Exit
+```
+
+Do not use flowchart syntax for a state diagram.
+
+### TCP sequence diagram looks flattened
+
+Inspect the generated source and actual SVG first. If the source is valid, inspect the DOM, CSS, SVG viewBox, dimensions, and Mermaid rendering API. Avoid arbitrary global CSS changes.
+
+### No AI image-generation backend
+
+This is expected unless a compatible local image model and runtime have been installed and tested. Mermaid diagrams remain a separate feature and should not be presented as AI-generated illustrations.
+
+### Answers do not cite sources
+
+Check document ingestion, page metadata, retrieval results, and the answer-generation prompt. General-knowledge answers should be distinguished from answers grounded in retrieved study material.
+
+---
+
+## Testing
+
+Run the tests supported by the repository. If it uses pytest, a common command is:
+
+```bash
+pytest
+```
+
+Check the actual project test configuration before relying on this command.
+
+Recommended coverage:
+
+- PDF extraction and page metadata
+- Chunking and retrieval
+- Local generation failures
+- Source attribution
+- Structured JSON parsing
+- Empty Mermaid source
+- Valid and invalid flowcharts
+- Valid and invalid sequence diagrams
+- Valid and invalid state diagrams
+- Artifact storage and retrieval
+- API response schemas
+- Frontend loading-state cleanup
+- Mermaid rendering failures
+- SVG/PNG export
+- Missing optional image backend
+
+Mock model calls in unit tests when practical. In addition to unit tests, verify real model output and actual browser rendering before declaring the visual engine stable.
+
+---
+
+## Roadmap
+
+Potential next steps, subject to repository status:
+
+- [ ] Stabilize structured model-response parsing.
+- [ ] Validate Mermaid syntax by diagram type.
+- [ ] Fix and verify TCP sequence-diagram rendering.
+- [ ] Fix and verify OS state-diagram rendering.
+- [ ] Ensure loading indicators always resolve.
+- [ ] Preserve source/page citations on generated diagrams.
+- [ ] Test SVG export and PNG conversion.
+- [ ] Improve artifact schema compatibility.
+- [ ] Add visual-generation capability detection.
+- [ ] Implement an optional local image-generation backend after hardware/model evaluation.
+- [ ] Improve offline installation and local asset checks.
+- [ ] Add end-to-end tests and performance measurements.
+
+Update this checklist as work is completed; do not mark an item complete without verification.
+
+---
+
+## Contributing
+
+Contributions should preserve the project's local-first and resource-conscious goals.
+
+1. Inspect existing architecture before changing it.
+2. Keep changes focused and modular.
+3. Add tests for new behavior and regressions.
+4. Preserve existing user documents, indexes, conversations, and artifacts.
+5. Avoid destructive Git commands and force pushes unless explicitly intended and reviewed.
+6. Document new configuration and dependencies.
+7. Do not claim a feature is working without testing it.
+
+---
+
+## Security
+
+- Treat uploaded documents and model-generated output as untrusted input.
+- Validate API payloads and enforce reasonable size limits.
+- Prevent path traversal and arbitrary file writes.
+- Do not execute generated content.
+- Avoid unsafe HTML insertion.
+- Sanitize or safely handle SVG content before serving or exporting it.
+- Keep secrets out of source control.
+- Bind development services appropriately and do not expose local inference or Flask debug services to untrusted networks.
+- Keep dependencies updated and review their licenses.
+
+---
+
+## License
+
+Add the project's chosen license here before distributing it. Until a license is included, do not assume that others have permission to reuse, modify, or redistribute the code.
+
+---
+
+## Acknowledgements
+
+StudyRAG brings together local AI inference, retrieval, document processing, vector search, and browser-based diagram rendering. It is built with the goal of making academic study tools more private, accessible, and practical on everyday hardware.
+
+---
+
+**Maintainer note:** Keep this README aligned with the actual repository. Before a public release, verify the feature-status table, version tags, installation commands, configuration names, API schemas, and test results against the current code.
